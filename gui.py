@@ -21,7 +21,7 @@ def add_plot(sender, app_data, pid):
     if dpg.does_alias_exist(f'data_{pid}'): dpg.remove_alias(f'data_{pid}')
 
     # add new plot
-    with dpg.collapsing_header(parent='window', label=f"{parameter['motec_name']} ({pid})", closable=True):
+    with dpg.collapsing_header(label=f"{parameter['motec_name']} ({pid})", closable=True, parent='window'):
         with dpg.plot(width=-1, height=150, no_mouse_pos=True, no_box_select=True):
             dpg.add_plot_axis(dpg.mvXAxis, tag=f'x_axis_{pid}')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'y_axis_{pid}')
@@ -42,9 +42,9 @@ def toggle_play_pause(sender, app_data):
 
 def refresh():
     while True:
-        dpg.set_value('throughput', rx.stats['throughput'])
-        dpg.set_value('latency', rx.stats['latency'])
-        dpg.set_value('error_rate', rx.stats['error_rate'])
+        dpg.set_value('throughput', round(rx.stats['throughput'], 3))
+        dpg.set_value('latency', round(rx.stats['latency'], 3))
+        dpg.set_value('error_rate', round(rx.stats['error_rate'], 3))
         if plots_active:
             for (id, plot) in plots.items():
                 plot['x'].append(rx.values[id]['timestamp'])
