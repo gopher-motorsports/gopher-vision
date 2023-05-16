@@ -25,7 +25,7 @@ python to-csv.py [INPUT].gdat [OUTPUT].csv
 python tx.py
 ```
 
-`rx.py` reads data from a connected XBee, parses packets, calculates statistics, and stores the most recent datapoint for each GopherCAN parameter.
+`rx.py` reads data from a connected XBee, parses packets, calculates statistics, and stores the most recent datapoint for each GopherCAN parameter. The `SAVE_HISTORY` flag optionally writes all data received to a log file.
 
 ```
 python rx.py

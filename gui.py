@@ -1,12 +1,10 @@
 import dearpygui.dearpygui as dpg
-import time
 import threading
 from collections import deque
 import go4v
 import rx
 
 PLOT_SIZE = 500 # samples displayed at once
-REFRESH_RATE = 30 # refresh rate for plots & stats (Hz)
 
 # create x and y deques for all parameters
 plots = {id: {'x': deque([0], maxlen=PLOT_SIZE), 'y': deque([0], maxlen=PLOT_SIZE)}\
@@ -40,22 +38,9 @@ def toggle_play_pause(sender, app_data):
             plot['x'] = deque([rx.values[id]['timestamp']], maxlen=PLOT_SIZE)
             plot['y'] = deque([rx.values[id]['data']], maxlen=PLOT_SIZE)
 
-def refresh():
-    while True:
-        dpg.set_value('throughput', round(rx.stats['throughput'], 3))
-        dpg.set_value('latency', round(rx.stats['latency'], 3))
-        dpg.set_value('error_rate', round(rx.stats['error_rate'], 3))
-        if plots_active:
-            for (id, plot) in plots.items():
-                plot['x'].append(rx.values[id]['timestamp'])
-                plot['y'].append(rx.values[id]['data'])
-                if dpg.does_item_exist(f'data_{id}'):
-                    dpg.set_value(f'data_{id}', [list(plot['x']), list(plot['y'])])          
-                    dpg.fit_axis_data(f'x_axis_{id}')
-                    dpg.fit_axis_data(f'y_axis_{id}')
-        time.sleep(1 / REFRESH_RATE)
-
 dpg.create_context()
+dpg.create_viewport(title='Gopher Motorsports Telemetry', width=600, height=600)
+dpg.setup_dearpygui()
 
 with dpg.window(tag='window'):
     dpg.set_primary_window('window', True)
@@ -101,12 +86,23 @@ with dpg.theme(tag='pause_btn_theme'):
 
 dpg.bind_item_theme('play_pause_btn', 'pause_btn_theme')
 
-dpg.create_viewport(title='Gopher Motorsports Telemetry', width=600, height=600)
-dpg.setup_dearpygui()
 dpg.show_viewport()
 
-threading.Thread(target=rx.rx).start()
-threading.Thread(target=refresh).start()
-dpg.start_dearpygui()
+threading.Thread(target=rx.rx, daemon=True).start()
 
+while dpg.is_dearpygui_running():
+    dpg.set_value('throughput', round(rx.stats['throughput'], 3))
+    dpg.set_value('latency', round(rx.stats['latency'], 3))
+    dpg.set_value('error_rate', round(rx.stats['error_rate'], 3))
+    if plots_active:
+        for (id, plot) in plots.items():
+            plot['x'].append(rx.values[id]['timestamp'])
+            plot['y'].append(rx.values[id]['data'])
+            if dpg.does_item_exist(f'data_{id}'):
+                dpg.set_value(f'data_{id}', [list(plot['x']), list(plot['y'])])          
+                dpg.fit_axis_data(f'x_axis_{id}')
+                dpg.fit_axis_data(f'y_axis_{id}')
+    dpg.render_dearpygui_frame()
+
+print('Exiting...')
 dpg.destroy_context()
