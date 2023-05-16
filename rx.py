@@ -20,8 +20,8 @@ port = serial.Serial(PORT, BAUD, timeout=TIMEOUT)
 values = {id: {'time': time.time(), 'data': 0} for id in go4v.parameters}
 
 stats = {
+    'packets': 0, # packets received
     'throughput': 0, # bytes read and parsed in the last sample (bytes/second)
-    'latency': 0, # (ms)
     'error_rate': 0 # ratio of invalid to good packets in the last sample (%)
 }
 
@@ -78,6 +78,7 @@ def rx():
 
         # parse packets
         for packet in packets[:-1]:
+            stats['packets'] += 1
             sample['packets'] += 1
             packet = go4v.unescape(packet)
             packet = go4v.parse(packet)

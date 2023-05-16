@@ -42,7 +42,7 @@ def toggle_play_pause(sender, app_data):
             plot['y'] = deque([rx.values[id]['data']], maxlen=PLOT_SIZE)
 
 dpg.create_context()
-dpg.create_viewport(title='Gopher Motorsports Telemetry', width=600, height=600)
+dpg.create_viewport(title='Gopher Motorsports Telemetry', width=800, height=600)
 dpg.setup_dearpygui()
 
 with dpg.window(tag='window'):
@@ -50,11 +50,11 @@ with dpg.window(tag='window'):
 
     with dpg.group(horizontal=True, horizontal_spacing=25):
         with dpg.group(horizontal=True):
+            dpg.add_text('packets received:')
+            dpg.add_text('0', tag='packets')
+        with dpg.group(horizontal=True):
             dpg.add_text('throughput (bps):')
             dpg.add_text('0.0', tag='throughput')
-        with dpg.group(horizontal=True):
-            dpg.add_text('latency (ms):')
-            dpg.add_text('0.0', tag='latency')
         with dpg.group(horizontal=True):
             dpg.add_text('error rate (%):')
             dpg.add_text('0.0', tag='error_rate')
@@ -94,8 +94,8 @@ dpg.show_viewport()
 threading.Thread(target=rx.rx, daemon=True).start()
 
 while dpg.is_dearpygui_running():
+    dpg.set_value('packets', rx.stats['packets'])
     dpg.set_value('throughput', round(rx.stats['throughput'], 3))
-    dpg.set_value('latency', round(rx.stats['latency'], 3))
     dpg.set_value('error_rate', round(rx.stats['error_rate'], 3))
     if plots_active:
         for (id, plot) in plots.items():
