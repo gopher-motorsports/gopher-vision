@@ -120,7 +120,8 @@ def parse(packet):
         'timestamp': timestamp,
         'id': id,
         'data': data,
-        'valid': valid
+        'valid': valid,
+        'rx_time': time.time()
     }
 
 def generate_packet(id):

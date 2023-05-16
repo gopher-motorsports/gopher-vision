@@ -11,13 +11,13 @@ BLOCK_SIZE = 1000 # bytes to read in each update
 SAMPLE_SIZE = 5000 # bytes to read before calculating stats
 TIMEOUT = 1 # seconds to wait for desired block size
 
-SAVE_HISTORY = True # saves all data received to a .gdat log file
+SAVE_HISTORY = False # saves all data received to a .gdat log file
 HISTORY_SIZE = 100000 # bytes to save before flushing to log file
 
 port = serial.Serial(PORT, BAUD, timeout=TIMEOUT)
 
 # latest value and corresponding timestamp for each parameter
-values = {id: {'timestamp': 0, 'data': 0} for id in go4v.parameters}
+values = {id: {'time': time.time(), 'data': 0} for id in go4v.parameters}
 
 stats = {
     'throughput': 0, # bytes read and parsed in the last sample (bytes/second)
@@ -82,7 +82,7 @@ def rx():
             packet = go4v.unescape(packet)
             packet = go4v.parse(packet)
             if packet['valid']:
-                values[packet['id']]['timestamp'] = packet['timestamp']
+                values[packet['id']]['time'] = packet['rx_time']
                 values[packet['id']]['data'] = packet['data']
             else:
                 sample['errors'] += 1

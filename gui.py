@@ -1,13 +1,15 @@
 import dearpygui.dearpygui as dpg
 import threading
 from collections import deque
+import time
 import go4v
 import rx
 
 PLOT_SIZE = 500 # samples displayed at once
 
 # create x and y deques for all parameters
-plots = {id: {'x': deque([0], maxlen=PLOT_SIZE), 'y': deque([0], maxlen=PLOT_SIZE)}\
+plots = {id: {'x': deque([rx.values[id]['time']], maxlen=PLOT_SIZE),\
+              'y': deque([rx.values[id]['data']], maxlen=PLOT_SIZE)}\
          for id in go4v.parameters}
 
 def add_plot(sender, app_data, pid):
@@ -20,10 +22,10 @@ def add_plot(sender, app_data, pid):
 
     # add new plot
     with dpg.collapsing_header(label=f"{parameter['motec_name']} ({pid})", closable=True, parent='window'):
-        with dpg.plot(width=-1, height=150, no_mouse_pos=True, no_box_select=True):
-            dpg.add_plot_axis(dpg.mvXAxis, tag=f'x_axis_{pid}')
+        with dpg.plot(width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True):
+            dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'x_axis_{pid}')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'y_axis_{pid}')
-            dpg.add_line_series([0], [0], label=parameter['motec_name'], parent=f'y_axis_{pid}', tag=f'data_{pid}')
+            dpg.add_line_series(list(plots[pid]['x']), list(plots[pid]['y']), label=parameter['motec_name'], parent=f'y_axis_{pid}', tag=f'data_{pid}')
         dpg.add_spacer(height=10)
 
 plots_active = True
@@ -35,7 +37,7 @@ def toggle_play_pause(sender, app_data):
     if plots_active:
         # play button was just pressed, clear plot history
         for (id, plot) in plots.items():
-            plot['x'] = deque([rx.values[id]['timestamp']], maxlen=PLOT_SIZE)
+            plot['x'] = deque([rx.values[id]['time']], maxlen=PLOT_SIZE)
             plot['y'] = deque([rx.values[id]['data']], maxlen=PLOT_SIZE)
 
 dpg.create_context()
@@ -96,7 +98,7 @@ while dpg.is_dearpygui_running():
     dpg.set_value('error_rate', round(rx.stats['error_rate'], 3))
     if plots_active:
         for (id, plot) in plots.items():
-            plot['x'].append(rx.values[id]['timestamp'])
+            plot['x'].append(rx.values[id]['time'])
             plot['y'].append(rx.values[id]['data'])
             if dpg.does_item_exist(f'data_{id}'):
                 dpg.set_value(f'data_{id}', [list(plot['x']), list(plot['y'])])          
