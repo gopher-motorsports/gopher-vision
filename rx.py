@@ -1,7 +1,6 @@
 import serial
 import time
 import go4v
-import math
 
 PORT = "COM7"
 BAUD = 230400

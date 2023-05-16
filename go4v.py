@@ -73,6 +73,7 @@ def unescape(packet):
         if packet[i] == int.from_bytes(ESC):
             # skip 7D control byte, unescape next byte
             i += 1
+            if i >= len(packet): break
             p += (packet[i] ^ 0x20).to_bytes()
         else:
             # add raw byte

@@ -13,6 +13,7 @@ opath = Path(sys.argv[2])
 print(f'Read {len(data)} bytes from {ipath.name}')
 print(f'METADATA: "{(filename + extension).decode()}"')
 
+print('Parsing packets...')
 packets = [go4v.parse(go4v.unescape(p)) for p in go4v.split(data)]
 errors = sum(not p['valid'] for p in packets)
 
@@ -22,3 +23,5 @@ with open(opath, 'w', newline='') as ofile:
     writer = csv.DictWriter(ofile, fieldnames=['hex', 'timestamp', 'id', 'data', 'valid'])
     writer.writeheader()
     writer.writerows(packets)
+
+print(f'Wrote {len(packets)} packets to {opath.name}')
