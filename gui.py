@@ -26,6 +26,7 @@ def add_plot(sender, app_data, pid):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'x_axis_{pid}')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'y_axis_{pid}')
             dpg.add_line_series(list(plots[pid]['x']), list(plots[pid]['y']), label=parameter['motec_name'], parent=f'y_axis_{pid}', tag=f'data_{pid}')
+            dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'value_{pid}')
         dpg.add_spacer(height=10)
 
 plots_active = True
@@ -101,7 +102,8 @@ while dpg.is_dearpygui_running():
             plot['x'].append(rx.values[id]['time'])
             plot['y'].append(rx.values[id]['data'])
             if dpg.does_item_exist(f'data_{id}'):
-                dpg.set_value(f'data_{id}', [list(plot['x']), list(plot['y'])])          
+                dpg.set_value(f'data_{id}', [list(plot['x']), list(plot['y'])])
+                dpg.set_item_label(f'value_{id}', round(plot['y'][-1], 3))
                 dpg.fit_axis_data(f'x_axis_{id}')
                 dpg.fit_axis_data(f'y_axis_{id}')
     dpg.render_dearpygui_frame()
