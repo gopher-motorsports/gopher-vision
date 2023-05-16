@@ -16,7 +16,7 @@ Gopher Vision
 `to-csv.py` extracts packets from a `.gdat` file and outputs them in CSV format.
 
 ```
-python to-csv.py [INPUT].gdat [OUTPUT].csv
+python to-csv.py [FILENAME].gdat
 ```
 
 `tx.py` generates random data packets from a specified list of parameter IDs and sends them to a connected XBee module. This is useful for testing the telemetry system.
