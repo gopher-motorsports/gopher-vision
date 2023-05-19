@@ -12,6 +12,7 @@ import yaml
 import struct
 import time
 import random
+import bisect
 
 START = bytes.fromhex('7e')
 ESC = bytes.fromhex('7d')
@@ -131,7 +132,8 @@ def generate_packet(id):
     '''
     param_type = parameters[id]['type']
     timestamp = int(time.time() * 1000 - start_ms)
-    data = random.uniform(0, 100) if param_type == 'FLOATING' else int.from_bytes(random.randbytes(ptypes[param_type]['size']), signed=ptypes[param_type]['signed'])
+    data = random.uniform(-100, 100) if param_type == 'FLOATING'\
+        else int.from_bytes(random.randbytes(ptypes[param_type]['size']), signed=ptypes[param_type]['signed'])
 
     timestamp = struct.pack(ptypes['UNSIGNED32']['format'], timestamp)
     id = struct.pack(ptypes['UNSIGNED16']['format'], id)
@@ -164,3 +166,20 @@ def split(bytes):
     '''
     packets = [START + pkt for pkt in bytes.split(START) if pkt]
     return packets
+
+def get_channels(t0, packets):
+    '''Organizes packets into GopherCAN parameter channels
+
+    t0: time corresponding to 0 packet timestamp
+    packets: a list of parsed packet objects
+    RETURNS: a dictionary of channels each with a list of datapoints and parameter info
+    '''
+    channels = {id: {'name': p['name'], 'unit': p['unit'], 'points': []}\
+                for (id, p) in parameters.items()}
+    
+    for packet in packets:
+        if packet['valid']:
+            datapoint = {'time': t0 + packet['timestamp'] / 1000, 'value': packet['data']}
+            bisect.insort(channels[packet['id']]['points'], datapoint, key=lambda point: point['time'])
+
+    return channels
