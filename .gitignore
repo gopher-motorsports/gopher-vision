@@ -1,2 +1,4 @@
 *.gdat
 *.ld
+*.ldx
+__pycache__
