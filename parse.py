@@ -15,22 +15,17 @@ if ipath.suffix != '.ld':
 
 print(f'parsing "{ipath}" ...')
 
-metadata = {
-    'device_serial': '',
-    'device_type': '',
-    'device_version': '',
-    'date': '',
-    'time': '',
-    'driver': '',
-    'vehicle_id': '',
-    'engine_id': '',
-    'venue': '',
-    'session': '',
-    'short_comment': '',
-    'team': '',
-    'event': '',
-    'long_comment': '',
-}
+def parse(file, offset, format, keys):
+    file.seek(offset)
+    data = f.read(struct.calcsize(format))
+    # unpack bytes according to format, decoding & trimming strings
+    values = [
+        value.decode().rstrip('\0') if type(value) is bytes
+        else value
+        for value in struct.unpack(format, data)
+    ]
+    # combine keys & values into a dictionary, ignoring empty keys
+    return {k:v for k,v in zip(keys, values) if k != ''}
 
 # HEADER =======================================================================
 # metadata shown in i2 at tools > details
@@ -70,26 +65,17 @@ header_format = (
 )
 
 f = open(ipath, 'rb')
-header = f.read(struct.calcsize(header_format))
-header_values = struct.unpack(header_format, header)
 
-# extract value
-(_, meta_ptr, data_ptr, event_ptr, _, _, _,
- metadata['device_serial'], metadata['device_type'], metadata['device_version'],
- _, _, _, _, metadata['date'], metadata['time'], metadata['driver'],
- metadata['vehicle_id'], metadata['engine_id'], metadata['venue'], _, _, _,
- metadata['session'], metadata['short_comment'], _, metadata['team']
-) = header_values
+# assign keys to format tokens, empty strings indicate discarded values
+header_keys = [
+    '', 'meta_ptr', 'data_ptr', 'event_ptr', '', '', '', 'device_serial',
+    'device_type', 'device_version', '', '', '', '', 'date', 'time', 'driver',
+    'vehicle_id', 'engine_id', 'venue', '', '', '', 'session', 'short_comment',
+    '', 'team'
+]
 
-# trim strings
-(metadata['device_type'], metadata['date'], metadata['time'], metadata['driver'],
- metadata['vehicle_id'], metadata['engine_id'], metadata['venue'],
- metadata['session'], metadata['short_comment'], metadata['team']
-) = map(lambda s: s.decode('ascii').rstrip('\0'),
-[metadata['device_type'], metadata['date'], metadata['time'], metadata['driver'],
- metadata['vehicle_id'], metadata['engine_id'], metadata['venue'],
- metadata['session'], metadata['short_comment'], metadata['team']]
-)
+header = parse(f, 0, header_format, header_keys)
+print(header)
 
 # EVENT ========================================================================
 # event details
@@ -104,16 +90,10 @@ event_format = (
     'I'         # 484         4           weather pointer
 )
 
-f.seek(event_ptr)
-event = f.read(struct.calcsize(event_format))
-event_values = struct.unpack(event_format, event)
+event_keys = ['event', 'session', 'long_comment', 'venue_ptr', 'weather_ptr']
 
-(metadata['event'], _, metadata['long_comment'], venue_ptr, weather_ptr) = event_values
-
-(metadata['event'], metadata['long_comment']
-) = map(lambda s: s.decode('ascii').rstrip('\0'),
-[metadata['event'], metadata['long_comment']]
-)
+event = parse(f, header['event_ptr'], event_format, event_keys)
+print(event)
 
 # VENUE ========================================================================
 # venue details
@@ -129,11 +109,10 @@ venue_format = (
     '64s'       # 44E         40          venue category
 )
 
-f.seek(venue_ptr)
-venue = f.read(struct.calcsize(venue_format))
-venue_values = struct.unpack(venue_format, venue)
+venue_keys = ['venue', '', 'vehicle_ptr', 'venue_category']
 
-(_, _, vehicle_ptr, _) = venue_values
+venue = parse(f, event['venue_ptr'], venue_format, venue_keys)
+print(venue)
 
 # VEHICLE ======================================================================
 # vehicle details
@@ -164,9 +143,10 @@ vehicle_format = (
     '64s'       # 524         400         vehicle number
 )
 
-f.seek(vehicle_ptr)
-vehicle = f.read(struct.calcsize(vehicle_format))
-vehicle_values = struct.unpack(vehicle_format, vehicle)
+vehicle_keys = []
+
+vehicle = parse(f, venue['vehicle_ptr'], vehicle_format, vehicle_keys)
+print(vehicle)
 
 # WEATHER ======================================================================
 # weather details
@@ -175,23 +155,23 @@ vehicle_values = struct.unpack(vehicle_format, vehicle)
 weather_format = (
     '<'         # OFFSET (h)  LENGTH (h)  VALUE
     '64s'       # 0           40          sky
-    '10s'       # 40          10          air temp
+    '16s'       # 40          10          air temp
     '8s'        # 50          8           air temp unit
-    '10s'       # 58          10          track temp
+    '16s'       # 58          10          track temp
     '8s'        # 68          8           track temp unit
-    '10s'       # 70          10          pressure
+    '16s'       # 70          10          pressure
     '8s'        # 80          8           pressure unit
-    '10s'       # 88          10          humidity
+    '16s'       # 88          10          humidity
     '8s'        # 98          8           humidity unit
-    '10s'       # A0          10          wind speed
+    '16s'       # A0          10          wind speed
     '8s'        # B0          8           wind speed unit
     '64s'       # B8          40          wind direction
     '1024s'     # D8          400         weather comment
 )
 
-f.seek(weather_ptr)
-weather = f.read(struct.calcsize(weather_format))
-weather_values = struct.unpack(weather_format, weather)
+weather_keys = []
 
-print(metadata)
+weather = parse(f, event['weather_ptr'], weather_format, weather_keys)
+print(weather)
+
 f.close()
