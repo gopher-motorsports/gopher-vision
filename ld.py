@@ -48,7 +48,7 @@ layouts['header'] = (
 keys['header'] = tuple(filter(lambda key: key != '', k))
 formats['header'] = ''.join(f)
 
-# EVENT =======================================================================
+# EVENT ========================================================================
 layouts['event'] = (
 ###  KEY              FORMAT     OFFSET (h)  LENGTH (h)
     ('',              '<'),      #
@@ -63,7 +63,7 @@ layouts['event'] = (
 keys['event'] = tuple(filter(lambda key: key != '', k))
 formats['event'] = ''.join(f)
 
-# VENUE =======================================================================
+# VENUE ========================================================================
 layouts['venue'] = (
 ###  KEY                FORMAT     OFFSET (h)  LENGTH (h)
     ('',                '<'),      #
@@ -79,7 +79,7 @@ layouts['venue'] = (
 keys['venue'] = tuple(filter(lambda key: key != '', k))
 formats['venue'] = ''.join(f)
 
-# VEHICLE =======================================================================
+# VEHICLE ======================================================================
 layouts['vehicle'] = (
 ###  KEY                   FORMAT     OFFSET (h)  LENGTH (h)
     ('',                   '<'),      #
@@ -111,7 +111,7 @@ layouts['vehicle'] = (
 keys['vehicle'] = tuple(filter(lambda key: key != '', k))
 formats['vehicle'] = ''.join(f)
 
-# WEATHER =======================================================================
+# WEATHER ======================================================================
 layouts['weather'] = (
 ###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)
     ('',                 '<'),      #
@@ -133,3 +133,26 @@ layouts['weather'] = (
 (k, f) = zip(*layouts['weather'])
 keys['weather'] = tuple(filter(lambda key: key != '', k))
 formats['weather'] = ''.join(f)
+
+# CHANNEL META =================================================================
+layouts['ch_meta'] = ( #3448
+###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)
+    ('',                 '<'),      #
+    ('prev_ptr',         'I'),      # 0         4
+    ('next_ptr',         'I'),      # 4         4
+    ('data_ptr',         'I'),      # 8         4
+    ('sample_count',     'I'),      # C         4
+
+    ('',                 '6x'),     #
+    ('sample_rate',      'H'),      # 16        2
+    ('',                 '8x'),     #
+
+    ('name',             '32s'),    # 20        20
+    ('unit',             '20s'),    # 40        14
+    
+    ('',                 '40x'),    # 54        28
+)
+
+(k, f) = zip(*layouts['ch_meta'])
+keys['ch_meta'] = tuple(filter(lambda key: key != '', k))
+formats['ch_meta'] = ''.join(f)
