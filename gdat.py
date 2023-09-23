@@ -1,8 +1,7 @@
 # .gdat files begin with "/PLM_YYYY-MM-DD-HH-MM-SS.gdat:" (RTC time of file creation)
-# followed by a series of packets of the following format:
+# followed by a series of packets of the following format (big endian):
 # 0    1 2 3 4     5 6   7 n    n+1
 # 7E   TIMESTAMP   ID    DATA   CHECKSUM
-# each component is big endian
 
 # 0x7E indicates the start of a packet
 # 0x7D indicates that the next byte has been escaped (XORed with 0x20)
@@ -16,6 +15,7 @@ import bisect
 
 START = bytes.fromhex('7e')
 ESC = bytes.fromhex('7d')
+MIN_PACKET_LENGTH = 9
 
 random.seed()
 start_ms = time.time() * 1000
@@ -25,8 +25,39 @@ def get_t0(sof):
         return time.strptime(sof.decode(), '/PLM_%Y-%m-%d-%H-%M-%S')
     except:
         return time.gmtime(0)
+    
+def load_parameters(config_path):
+    parameters = {}
+    types = {
+        'UNSIGNED8' : { 'signed': False, 'size': 1, 'format': '>B' },
+        'UNSIGNED16' : { 'signed': False, 'size': 2, 'format': '>H' },
+        'UNSIGNED32' : { 'signed': False, 'size': 4, 'format': '>I' },
+        'UNSIGNED64' : { 'signed': False, 'size': 8, 'format': '>Q' },
+        'SIGNED8' : { 'signed': True, 'size': 1, 'format': '>b' },
+        'SIGNED16' : { 'signed': True, 'size': 2, 'format': '>h' },
+        'SIGNED32' : { 'signed': True, 'size': 4, 'format': '>i' },
+        'SIGNED64' : { 'signed': True, 'size': 8, 'format': '>q' },
+        'FLOATING' : { 'signed': False, 'size': 4, 'format': '>f' }
+    }
 
-# PACKET UTILITIES =============================================================
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+        # build a new parameter dictionary
+        for p in config['parameters'].values():
+            if p['id'] in parameters:
+                print(f"WARNING: duplicate id ({p['id']})")
+            else:
+                parameters[p['id']] = {
+                    'id': p['id'],
+                    'name': p['motec_name'],
+                    'unit': p['unit'],
+                    'type': p['type'],
+                    'size': types[p['type']]['size'],
+                    'format': types[p['type']]['format'],
+                    'signed': types[p['type']]['signed']
+                }
+    return parameters
+
 def escape(packet):
     p = START
     for b in packet[1:]:
@@ -60,68 +91,12 @@ def checksum(packet):
         sum += byte
     return (sum).to_bytes(2)[-1] == packet[-1]
 
-def parse(bytes):
-    packets = []
+def parse(bytes, parameters):
+    print('parsing data...')
+
+    packets = bytes.split(START)
     errors = 0
 
-    # split byte string by start delimiter
-    for p in [unescape(START + p) for p in bytes.split(START) if p]:
-        # split packet into components
-        ts = int.from_bytes(p[1:5])
-        id = int.from_bytes(p[5:7])
-        data = p[7:-1]
-        valid = checksum(p)
-
-        # discard invalid packets
-        if valid: packets.append({ 'timestamp': ts, 'id': id, 'data': data })
-        else: errors += 1
-
-    return (packets, errors)
-
-# GOPHERCAN UTILITIES ==========================================================
-def load_parameters(config_path):
-    parameters = {}
-    types = {
-        'UNSIGNED8' : { 'signed': False, 'size': 1, 'format': '>B' },
-        'UNSIGNED16' : { 'signed': False, 'size': 2, 'format': '>H' },
-        'UNSIGNED32' : { 'signed': False, 'size': 4, 'format': '>I' },
-        'UNSIGNED64' : { 'signed': False, 'size': 8, 'format': '>Q' },
-        'SIGNED8' : { 'signed': True, 'size': 1, 'format': '>b' },
-        'SIGNED16' : { 'signed': True, 'size': 2, 'format': '>h' },
-        'SIGNED32' : { 'signed': True, 'size': 4, 'format': '>i' },
-        'SIGNED64' : { 'signed': True, 'size': 8, 'format': '>q' },
-        'FLOATING' : { 'signed': False, 'size': 4, 'format': '>f' }
-    }
-
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-        # build a new parameter dictionary
-        for p in config['parameters'].values():
-            if p['id'] in parameters:
-                print(f"WARNING: duplicate id ({p['id']})")
-            else:
-                parameters[p['id']] = {
-                    'id': p['id'],
-                    'name': p['motec_name'],
-                    'unit': p['unit'],
-                    'type': p['type'],
-                    'size': types[p['type']]['size'],
-                    'format': types[p['type']]['format'],
-                    'signed': types[p['type']]['signed']
-                }
-
-    return parameters
-
-def decode_data(packets, parameters):
-    for p in packets:
-        try:
-            p['data'] = struct.unpack(parameters[p['id']]['format'], p['data'])[0]
-        except:
-            print(f"failed to decode packet: {p} using parameter ({p['id']})")
-            p['valid'] = False
-
-def get_channels(packets, parameters):
-    # organize packets into time series channels
     channels = {
         id: {
             'id': id,
@@ -133,11 +108,37 @@ def get_channels(packets, parameters):
         for (id, param) in parameters.items()
     }
 
-    for packet in packets:
-        point = (packet['timestamp'], packet['data'])
-        # insert point in time-sorted position
-        bisect.insort(channels[packet['id']]['points'], point, key=lambda pt: pt[0])
+    for p in packets:
+        p = unescape(START + p)
+        # verify packet size (w/o start delimiter)
+        if len(p) < MIN_PACKET_LENGTH - 1:
+            print(f'packet too small: {p}')
+            errors += 1
+            continue
+        # split packet into components
+        ts = int.from_bytes(p[1:5])
+        id = int.from_bytes(p[5:7])
+        data = p[7:-1]
+        # verify checksum
+        if not checksum(p):
+            print(f'invalid checksum: {p}')
+            errors += 1
+            continue
+        # decode data using parameter info
+        try:
+            data = struct.unpack(parameters[id]['format'], data)[0]
+        except:
+            print(f'failed to decode packet data: {p}')
+            errors += 1
+            continue
+        # add to channel
+        channels[id]['points'].append((ts, data))
 
+    # sort channel data by timestamp
+    for id in channels:
+        channels[id]['points'].sort(key=lambda pt: pt[0])
+
+    print(f'parsed {len(bytes)} bytes, {len(packets)} packets, {errors} errors\n')
     return channels
 
 def generate_packet(param):

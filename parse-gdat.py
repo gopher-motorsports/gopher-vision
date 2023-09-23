@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 import time
+from tabulate import tabulate
+
 import gdat
 
 if len(sys.argv) != 3:
@@ -35,15 +37,10 @@ print(f"t0: {time.strftime('%m/%d/%Y %H:%M:%S', t0)}\n")
 # randomized data
 data = gdat.generate_data(parameters, 1000)
 
-print('parsing packets...')
-(packets, errors) = gdat.parse(data)
-gdat.decode_data(packets, parameters)
-print(f'parsed {len(packets)} valid packets, {errors} errors\n')
+channels = gdat.parse(data, parameters)
 
-print('forming channels...')
-channels = gdat.get_channels(packets, parameters)
-print(f'created {len(channels)} channels\n')
-
+chs = []
 for ch in channels.values():
-    print(f"{ch['name']}: id={ch['id']} unit={ch['unit']} "
-          f"type={len(ch['type'])} points={len(ch['points'])}")
+    ch['points'] = len(ch['points'])
+    chs.append(ch)
+print(tabulate(chs, headers='keys'))
