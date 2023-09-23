@@ -1,14 +1,16 @@
+# file structure based on logs from the MoTeC EDL3 v5.6
+
 # .ld files are split into several sections linked by file pointers
 # layouts contain a series of (key, format) pairs for each value in a section
 # values with empty keys are unused/unknown
+# key lists and format strings are derived from the corresponding layout
 
 # KEY: identifies the value
 # FORMAT: mapping between byte string and Python value
 # OFFSET (hex): file offset of the value wrt the beginning of the section
 # LENGTH (hex): length of the value in bytes
-layouts = {}
 
-# key lists and format strings are derived from the corresponding layout
+layouts = {}
 keys = {}
 formats = {}
 
@@ -17,15 +19,15 @@ layouts['header'] = (
 ###  KEY                FORMAT     OFFSET (h)  LENGTH (h)
     ('',                '<'),      #
     ('sof',             'Q'),      # 0         8
-    ('meta_ptr',        'I'),      # 8         4         0x3448
-    ('data_ptr',        'I'),      # C         4         0x5A10
+    ('meta_ptr',        'I'),      # 8         4
+    ('data_ptr',        'I'),      # C         4
     ('',                '20x'),    # 10        14
-    ('event_ptr',       'I'),      # 24        4         0x6E2
+    ('event_ptr',       'I'),      # 24        4
     ('',                '30x'),    # 28        1E
     ('device_serial',   'I'),      # 46        4
     ('device_type',     '8s'),     # 4A        8
-    ('device_version',  'H'),      # 52        2
-    ('pro1',            'H'),      # 54        2         pro logging
+    ('device_version',  'H'),      # 52        2         scale: 100
+    ('pro1',            'H'),      # 54        2         0x80 pro logging
     ('num_channels',    'H'),      # 56        2
     ('num_channels2',   'H'),      # 58        2
     ('',                '4x'),     # 5A        4
@@ -36,7 +38,7 @@ layouts['header'] = (
     ('engine_id',       '64s'),    # 11E       40
     ('venue',           '64s'),    # 15E       40
     ('',                '1088x'),  # 19E       440
-    ('pro2',            'I'),      # 5DE       4         pro logging
+    ('pro2',            'I'),      # 5DE       4         0xD20822 pro logging
     ('',                '2x'),     # 5E2       2
     ('session',         '64s'),    # 5E4       40
     ('short_comment',   '64s'),    # 624       40
@@ -55,8 +57,8 @@ layouts['event'] = (
     ('event',         '64s'),    # 0         40
     ('session',       '64s'),    # 40        40
     ('long_comment',  '1024s'),  # 80        400
-    ('venue_ptr',     'I'),      # 480       4         0x1336
-    ('weather_ptr',   'I'),      # 484       4         0x2C48
+    ('venue_ptr',     'I'),      # 480       4
+    ('weather_ptr',   'I'),      # 484       4
 )
 
 (k, f) = zip(*layouts['event'])
@@ -69,9 +71,9 @@ layouts['venue'] = (
     ('',                '<'),      #
     ('venue',           '64s'),    # 0         40
     ('',                '2x'),     # 40        2
-    ('venue_length',    'I'),      # 42        4
+    ('venue_length',    'I'),      # 42        4         unit: mm
     ('',                '1028x'),  # 46        404
-    ('vehicle_ptr',     'I'),      # 44A       4         0x1F54
+    ('vehicle_ptr',     'I'),      # 44A       4
     ('venue_category',  '64s'),    # 44E       40
 )
 
@@ -86,23 +88,23 @@ layouts['vehicle'] = (
     ('vehicle_id',         '64s'),    # 0         40
     ('vehicle_desc',       '64s'),    # 40        40
     ('engine_id',          '64s'),    # 80        40
-    ('vehicle_weight',     'H'),      # C0        2
-    ('fuel_tank',          'H'),      # C2        2
+    ('vehicle_weight',     'H'),      # C0        2         unit: kg
+    ('fuel_tank',          'H'),      # C2        2         unit: deciliter
     ('vehicle_type',       '32s'),    # C4        20
     ('driver_type',        '32s'),    # E4        20
-    ('diff_ratio',         'H'),      # 104       2
-    ('gear1',              'H'),      # 106       2
-    ('gear2',              'H'),      # 108       2
-    ('gear3',              'H'),      # 10A       2
-    ('gear4',              'H'),      # 10C       2
-    ('gear5',              'H'),      # 10E       2
-    ('gear6',              'H'),      # 110       2
-    ('gear7',              'H'),      # 112       2
-    ('gear8',              'H'),      # 114       2
-    ('gear9',              'H'),      # 116       2
-    ('gear10',             'H'),      # 118       2
-    ('vehicle_track',      'H'),      # 11A       2
-    ('vehicle_wheelbase',  'I'),      # 11C       4
+    ('diff_ratio',         'H'),      # 104       2         scale: 1000
+    ('gear1',              'H'),      # 106       2         scale: 1000
+    ('gear2',              'H'),      # 108       2         scale: 1000
+    ('gear3',              'H'),      # 10A       2         scale: 1000
+    ('gear4',              'H'),      # 10C       2         scale: 1000
+    ('gear5',              'H'),      # 10E       2         scale: 1000
+    ('gear6',              'H'),      # 110       2         scale: 1000
+    ('gear7',              'H'),      # 112       2         scale: 1000
+    ('gear8',              'H'),      # 114       2         scale: 1000
+    ('gear9',              'H'),      # 116       2         scale: 1000
+    ('gear10',             'H'),      # 118       2         scale: 1000
+    ('vehicle_track',      'H'),      # 11A       2         unit: mm
+    ('vehicle_wheelbase',  'I'),      # 11C       4         unit: mm
     ('vehicle_comment',    '1028s'),  # 120       404
     ('vehicle_number',     '64s'),    # 524       400
 )
@@ -134,22 +136,25 @@ layouts['weather'] = (
 keys['weather'] = tuple(filter(lambda key: key != '', k))
 formats['weather'] = ''.join(f)
 
-# CHANNEL META =================================================================
-layouts['ch_meta'] = ( #3448
+# CHANNEL METADATA =============================================================
+# value = (data / divisor * 10^-shift + offset) * scalar
+layouts['ch_meta'] = (
 ###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)
     ('',                 '<'),      #
     ('prev_ptr',         'I'),      # 0         4
     ('next_ptr',         'I'),      # 4         4
     ('data_ptr',         'I'),      # 8         4
     ('sample_count',     'I'),      # C         4
-
-    ('',                 '6x'),     #
+    ('',                 '4x'),     # 10        4
+    ('size',             'H'),      # 14        2         2: s16 4: s32
     ('sample_rate',      'H'),      # 16        2
-    ('',                 '8x'),     #
-
+    ('offset',           'h'),      # 18        2
+    ('scalar',           'h'),      # 1A        2
+    ('divisor',          'h'),      # 1C        2
+    ('shift',            'h'),      # 1E        2
     ('name',             '32s'),    # 20        20
-    ('unit',             '20s'),    # 40        14
-    
+    ('short_name',       '8s'),     # 40        8
+    ('unit',             '12s'),    # 48        C
     ('',                 '40x'),    # 54        28
 )
 
