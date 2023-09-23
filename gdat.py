@@ -9,9 +9,15 @@
 # CHECKSUM = sum of bytes ignoring overflow (including start delimiter), calculated on unescaped packet
 
 import time
+import yaml
+import struct
+import random
 
 START = bytes.fromhex('7e')
 ESC = bytes.fromhex('7d')
+
+random.seed()
+start_ms = time.time() * 1000
 
 def get_t0(sof):
     try:
@@ -19,6 +25,7 @@ def get_t0(sof):
     except:
         return time.gmtime(0)
 
+# PACKET UTILITIES =============================================================
 def escape(packet):
     p = START
     for b in packet[1:]:
@@ -65,3 +72,69 @@ def parse(bytes):
     } for p in packets]
 
     return packets
+
+# GOPHERCAN UTILITIES ==========================================================
+def load_parameters(config_path):
+    parameters = {}
+    types = {
+        'UNSIGNED8' : { 'signed': False, 'size': 1, 'format': '>B' },
+        'UNSIGNED16' : { 'signed': False, 'size': 2, 'format': '>H' },
+        'UNSIGNED32' : { 'signed': False, 'size': 4, 'format': '>I' },
+        'UNSIGNED64' : { 'signed': False, 'size': 8, 'format': '>Q' },
+        'SIGNED8' : { 'signed': True, 'size': 1, 'format': '>b' },
+        'SIGNED16' : { 'signed': True, 'size': 2, 'format': '>h' },
+        'SIGNED32' : { 'signed': True, 'size': 4, 'format': '>i' },
+        'SIGNED64' : { 'signed': True, 'size': 8, 'format': '>q' },
+        'FLOATING' : { 'signed': False, 'size': 4, 'format': '>f' }
+    }
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+        # build a new parameter dictionary
+        for p in config['parameters'].values():
+            if p['id'] in parameters:
+                print(f"WARNING: duplicate id ({p['id']})")
+            else:
+                parameters[p['id']] = {
+                    'id': p['id'],
+                    'name': p['motec_name'],
+                    'unit': p['unit'],
+                    'type': p['type'],
+                    'size': types[p['type']]['size'],
+                    'format': types[p['type']]['format'],
+                    'signed': types[p['type']]['signed']
+                }
+
+    return parameters
+
+def decode_data(packets, parameters):
+    for p in packets:
+        try:
+            p['data'] = struct.unpack(parameters[p['id']]['format'], p['data'])[0]
+        except:
+            print(f"failed to decode packet: {p} using parameter ({p['id']})")
+            p['valid'] = False
+
+def generate_packet(param):
+    ts = int(time.time() * 1000 - start_ms)
+    data = random.uniform(-100, 100) if param['type'] == 'FLOATING'\
+        else int.from_bytes(random.randbytes(param['size']), signed=param['signed'])
+    
+    packet = START
+    packet += struct.pack('>I', ts)
+    packet += struct.pack('>H', param['id'])
+    packet += struct.pack(param['format'], data)
+
+    checksum = 0
+    for b in packet: checksum += b
+    packet += (checksum).to_bytes(2)[-1:]
+
+    return packet
+
+def generate_data(parameters, nbytes):
+    b = b''
+    while len(b) < nbytes:
+        param = random.choice(list(parameters.values()))
+        packet = generate_packet(param)
+        b += escape(packet)
+    return b
