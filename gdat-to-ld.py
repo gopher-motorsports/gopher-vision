@@ -3,7 +3,7 @@ from pathlib import Path
 
 # check arguments
 if len(sys.argv) != 3:
-    raise Exception('expected "python to-ld.py path/to/input.gdat path/to/output.ld"')
+    raise Exception('expected "python gdat-to-ld.py path/to/input.gdat path/to/output.ld"')
 
 ipath = Path(sys.argv[1])
 opath = Path(sys.argv[2])
@@ -18,7 +18,6 @@ if opath.is_file():
     raise Exception(f'"{opath}" already exists')
 
 if opath.suffix != '.ld':
-    raise Exception('expected an output path to a .ld file')
+    raise Exception('expected an output path to an .ld file')
 
-# form data channels
 print(f'parsing "{ipath}" ...')

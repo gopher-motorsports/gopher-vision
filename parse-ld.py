@@ -4,7 +4,7 @@ import struct
 from ld import keys, formats
 
 if len(sys.argv) != 2:
-    raise Exception('expected "python parseld.py path/to/data.ld"')
+    raise Exception('expected "python parse-ld.py path/to/data.ld"')
 
 ipath = Path(sys.argv[1])
 
