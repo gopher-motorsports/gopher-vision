@@ -12,6 +12,7 @@ import time
 import yaml
 import struct
 import random
+import bisect
 
 START = bytes.fromhex('7e')
 ESC = bytes.fromhex('7d')
@@ -60,18 +61,22 @@ def checksum(packet):
     return (sum).to_bytes(2)[-1] == packet[-1]
 
 def parse(bytes):
+    packets = []
+    errors = 0
+
     # split byte string by start delimiter
-    packets = [unescape(START + p) for p in bytes.split(START) if p]
+    for p in [unescape(START + p) for p in bytes.split(START) if p]:
+        # split packet into components
+        ts = int.from_bytes(p[1:5])
+        id = int.from_bytes(p[5:7])
+        data = p[7:-1]
+        valid = checksum(p)
 
-    # split packets into components
-    packets = [{
-        'valid': checksum(p),
-        'timestamp': int.from_bytes(p[1:5]),
-        'id': int.from_bytes(p[5:7]),
-        'data': p[7:-1]
-    } for p in packets]
+        # discard invalid packets
+        if valid: packets.append({ 'timestamp': ts, 'id': id, 'data': data })
+        else: errors += 1
 
-    return packets
+    return (packets, errors)
 
 # GOPHERCAN UTILITIES ==========================================================
 def load_parameters(config_path):
@@ -114,6 +119,26 @@ def decode_data(packets, parameters):
         except:
             print(f"failed to decode packet: {p} using parameter ({p['id']})")
             p['valid'] = False
+
+def get_channels(packets, parameters):
+    # organize packets into time series channels
+    channels = {
+        id: {
+            'id': id,
+            'name': param['name'],
+            'unit': param['unit'],
+            'type': param['type'],
+            'points': []
+        }
+        for (id, param) in parameters.items()
+    }
+
+    for packet in packets:
+        point = (packet['timestamp'], packet['data'])
+        # insert point in time-sorted position
+        bisect.insort(channels[packet['id']]['points'], point, key=lambda pt: pt[0])
+
+    return channels
 
 def generate_packet(param):
     ts = int(time.time() * 1000 - start_ms)

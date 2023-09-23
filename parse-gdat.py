@@ -32,9 +32,18 @@ print(f'read {len(data)} bytes of data')
 t0 = gdat.get_t0(sof)
 print(f"t0: {time.strftime('%m/%d/%Y %H:%M:%S', t0)}\n")
 
+# randomized data
+data = gdat.generate_data(parameters, 1000)
+
 print('parsing packets...')
-d = gdat.generate_data(parameters, 1000)
-packets = gdat.parse(d)
-# packets = gdat.parse(data)
+(packets, errors) = gdat.parse(data)
 gdat.decode_data(packets, parameters)
-print(f'parsed {len(packets)} packets')
+print(f'parsed {len(packets)} valid packets, {errors} errors\n')
+
+print('forming channels...')
+channels = gdat.get_channels(packets, parameters)
+print(f'created {len(channels)} channels\n')
+
+for ch in channels.values():
+    print(f"{ch['name']}: id={ch['id']} unit={ch['unit']} "
+          f"type={len(ch['type'])} points={len(ch['points'])}")
