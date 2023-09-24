@@ -182,6 +182,7 @@ print(f'writing to "{opath}"...')
 with open(opath, 'wb') as f:
     f.write(header + event + venue + vehicle + weather)
 
+    meta = b''
     data_size = 0
     for i, ch in enumerate(channels.values()):
         ch['meta']['data_ptr'] = data_offset + data_size
@@ -193,8 +194,10 @@ with open(opath, 'wb') as f:
         if i == len(channels) - 1: ch['meta']['next_ptr'] = 0
         else: ch['meta']['next_ptr'] = meta_offset + ch_meta_size * (i + 1)
 
-        ch_meta = struct.pack(ld.formats['ch_meta'], *encode(ch['meta'].values()))
-        f.write(ch_meta)
+        meta += struct.pack(ld.formats['ch_meta'], *encode(ch['meta'].values()))
+
+    # metadata for all channels
+    f.write(meta)
 
     for ch in channels.values():
         if ch['meta']['size'] == 2: fmt = f"<h"
@@ -204,6 +207,7 @@ with open(opath, 'wb') as f:
         for d in ch['data']:
             data += struct.pack(fmt, d)
 
+        # complete data for a single channel
         f.write(data)
 
 print('done.')
