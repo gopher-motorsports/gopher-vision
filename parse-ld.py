@@ -66,13 +66,19 @@ print('\nCHANNELS ====================')
 if header['meta_ptr'] > 0:
     ch_info = {}
     ch_data = {}
+    num_ch = 0
     next_ch = header['meta_ptr']
 
     while next_ch:
         # parse channel metadata
         ch = parse(f, next_ch, keys['ch_meta'], formats['ch_meta'])
         ch['meta_ptr'] = next_ch
-        ch_info[ch['name']] = ch
+        num_ch += 1
+
+        if ch['name'] in ch_info:
+            print(f"found duplicate channel name: \"{ch['name']}\"")
+        else:
+            ch_info[ch['name']] = ch
 
         if ch['size'] == 2:
             fmt = f"<{ch['sample_count']}h"
@@ -93,11 +99,11 @@ if header['meta_ptr'] > 0:
         print(ch)
         next_ch = ch['next_ptr']
 
-    if len(ch_info) == header['num_channels']:
-        print(f'found {len(ch_info)} channels\n')
+    if num_ch == header['num_channels']:
+        print(f'found {num_ch} channels\n')
     else:
         print(f"WARNING: num_channels ({header['num_channels']})",
-            f"does not match number of channels found ({len(ch_info)})\n")
+            f"does not match number of channels found ({num_ch})\n")
 else:
     print('meta_ptr missing')
 
