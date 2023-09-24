@@ -80,6 +80,7 @@ venue_offset = event_offset + struct.calcsize(ld.formats['event'])
 vehicle_offset = venue_offset + struct.calcsize(ld.formats['venue'])
 weather_offset = vehicle_offset + struct.calcsize(ld.formats['vehicle'])
 meta_offset = weather_offset + struct.calcsize(ld.formats['weather'])
+
 ch_meta_size = struct.calcsize(ld.formats['ch_meta'])
 meta_size = len(channels) * ch_meta_size
 data_offset = meta_offset + meta_size
@@ -179,11 +180,7 @@ weather = struct.pack(ld.formats['weather'], *encode(weather_values.values()))
 
 print(f'writing to "{opath}"...')
 with open(opath, 'wb') as f:
-    f.write(header)
-    f.write(event)
-    f.write(venue)
-    f.write(vehicle)
-    f.write(weather)
+    f.write(header + event + venue + vehicle + weather)
 
     data_size = 0
     for i, ch in enumerate(channels.values()):
