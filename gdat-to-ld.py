@@ -49,8 +49,10 @@ def encode(values):
 channels = {
     1: {
         'id': 1,
-        'name': 'Channel1',
-        'unit': 'C'
+        'name': 'Engine RPM',
+        'short_name': 'rpm',
+        'unit': '',
+        'data': [1000, 2000, 3000, 4000, 5000]
     }
 }
 
@@ -60,20 +62,18 @@ for ch in channels.values():
         'prev_ptr': 0,
         'next_ptr': 0,
         'data_ptr': 0,
-        'sample_count': 1,
-        '?': 0x00030004,
+        'sample_count': len(ch['data']),
+        'magic1': 196609,
         'size': 2,
         'sample_rate': 1,
         'offset': 0,
         'scalar': 1,
         'divisor': 1,
-        'shift': 1,
+        'shift': 0,
         'name': ch['name'],
-        'short_name': 'CH',
+        'short_name': ch['short_name'],
         'unit': ch['unit'],
     }
-
-    ch['data'] = [0]
 
 event_offset = struct.calcsize(ld.formats['header'])
 venue_offset = event_offset + struct.calcsize(ld.formats['event'])
@@ -86,26 +86,27 @@ data_offset = meta_offset + meta_size
 
 # order must match ld.formats['header']
 header_values = {
-    'sof': 64,
+    'sof': 7567732375616,
     'meta_ptr': meta_offset,
     'data_ptr': data_offset,
     'event_ptr': event_offset,
+    'magic1': 15,
     'device_serial': 21115,
     'device_type': 'ADL',
     'device_version': 560,
-    'pro1': 128,
+    'magic2': 128,
     'num_channels': len(channels),
     'num_channels2': len(channels),
-    'pro2': 327700,
-    'date': '29/09/2023',
+    'magic3': 66036,
+    'date': '03/10/2021',
     'time': '13:19:30',
     'driver': 'Driver',
     'vehicle_id': 'VehicleID',
     'engine_id': 'EngineID',
     'venue': 'Venue',
-    'pro3': 45126145,
+    'magic4': 45126145,
     'session': 'Session',
-    'short_comment': 'Short Comment',
+    'short_comment': 'ShortComment',
     'team': 'Team'
 }
 
@@ -113,7 +114,7 @@ header_values = {
 event_values = {
     'event': 'Event',
     'session': 'Session',
-    'long_comment': 'Long Comment',
+    'long_comment': 'LongComment',
     'venue_ptr': venue_offset,
     'weather_ptr': weather_offset
 }
@@ -121,49 +122,49 @@ event_values = {
 # order must match ld.formats['venue']
 venue_values = {
     'venue': 'Venue',
-    'venue_length': 100000,
+    'venue_length': 420000,
     'vehicle_ptr': vehicle_offset,
-    'venue_category': 'VenueCategory'
+    'venue_category': 'Category'
 }
 
 # order must match ld.formats['vehicle']
 vehicle_values = {
     'vehicle_id': 'VehicleID',
-    'vehicle_desc': 'VehicleDesc',
+    'vehicle_desc': 'VehicleDescription',
     'engine_id': 'EngineID',
-    'vehicle_weight': 180,
-    'fuel_tank': 750,
+    'vehicle_weight': 100,
+    'fuel_tank': 2000,
     'vehicle_type': 'VehicleType',
-    'driver_type': 'DriverType',
-    'diff_ratio': 24000,
-    'gear1': 1110,
-    'gear2': 2220,
-    'gear3': 3330,
-    'gear4': 4440,
-    'gear5': 5550,
-    'gear6': 6660,
-    'gear7': 7770,
-    'gear8': 8880,
-    'gear9': 9990,
-    'gear10': 10100,
-    'vehicle_track': 45,
-    'vehicle_wheelbase': 2000,
+    'driver_type': 'DriveType',
+    'diff_ratio': 41248,
+    'gear1': 1000,
+    'gear2': 2000,
+    'gear3': 3000,
+    'gear4': 4000,
+    'gear5': 5000,
+    'gear6': 6000,
+    'gear7': 7000,
+    'gear8': 8000,
+    'gear9': 9000,
+    'gear10': 10000,
+    'vehicle_track': 300,
+    'vehicle_wheelbase': 400,
     'vehicle_comment': 'VehicleComment',
     'vehicle_number': 'VehicleNumber'
 }
 
 # order must match ld.formats['weather']
 weather_values = {
-    'sky': 'Sky',
+    'sky': 'Sunny',
     'air_temp': '200',
     'air_temp_unit': 'C',
     'track_temp': '100',
     'track_temp_unit': 'C',
-    'pressure': '300',
+    'pressure': '3',
     'pressure_unit': 'bar',
-    'humidity': '30',
+    'humidity': '40',
     'humidity_unit': '%',
-    'wind_speed': '60',
+    'wind_speed': '50',
     'wind_speed_unit': 'km/h',
     'wind_direction': 'WindDirection',
     'weather_comment': 'WeatherComment'

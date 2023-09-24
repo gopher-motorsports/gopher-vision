@@ -85,8 +85,7 @@ if header['meta_ptr'] > 0:
         elif ch['size'] == 4:
             fmt = f"<{ch['sample_count']}i"
         else:
-            print(f"\"{ch['name']}\" has unknown data size\n{ch}")
-            continue
+            print(f"\"{ch['name']}\" has unknown data size ({ch['size']})\n")
 
         # jump to, unpack channel data
         f.seek(ch['data_ptr'])

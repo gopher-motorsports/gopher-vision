@@ -23,14 +23,15 @@ layouts['header'] = (
     ('data_ptr',        'I'),      # C         4
     ('',                '20x'),    # 10        14
     ('event_ptr',       'I'),      # 24        4
-    ('',                '30x'),    # 28        1E
+    ('',                '28x'),    # 28        1C
+    ('magic1',          'H'),      # 44        2         15
     ('device_serial',   'I'),      # 46        4
     ('device_type',     '8s'),     # 4A        8
     ('device_version',  'H'),      # 52        2         scale: 100
-    ('pro1',            'H'),      # 54        2         0x80 pro logging
+    ('magic2',          'H'),      # 54        2         128
     ('num_channels',    'H'),      # 56        2
     ('num_channels2',   'H'),      # 58        2
-    ('pro2',            'I'),      # 5A        4         0x10064 pro logging
+    ('magic3',          'I'),      # 5A        4         66036
     ('date',            '32s'),    # 5E        20
     ('time',            '32s'),    # 7E        20
     ('driver',          '64s'),    # 9E        40
@@ -38,13 +39,12 @@ layouts['header'] = (
     ('engine_id',       '64s'),    # 11E       40
     ('venue',           '64s'),    # 15E       40
     ('',                '1088x'),  # 19E       440
-    ('pro3',            'I'),      # 5DE       4         0xD20822 pro logging
+    ('magic4',          'I'),      # 5DE       4         45126145
     ('',                '2x'),     # 5E2       2
     ('session',         '64s'),    # 5E4       40
     ('short_comment',   '64s'),    # 624       40
     ('',                '48x'),    # 664       30
     ('team',            '64s'),    # 694       40
-    # ('', '14x') # E
 )
 
 (k, f) = zip(*layouts['header'])
@@ -60,7 +60,6 @@ layouts['event'] = (
     ('long_comment',  '1024s'),  # 80        400
     ('venue_ptr',     'I'),      # 480       4
     ('weather_ptr',   'I'),      # 484       4
-    # ('', '1996x') # 7cc
 )
 
 (k, f) = zip(*layouts['event'])
@@ -76,8 +75,8 @@ layouts['venue'] = (
     ('venue_length',    'I'),      # 42        4         unit: mm
     ('',                '1028x'),  # 46        404
     ('vehicle_ptr',     'I'),      # 44A       4
-    ('venue_category',  '64s'),    # 44E       40
-    # ('', '1936x') # 790
+    ('venue_category',  '1024s'),  # 44E       400    
+    ('',                '976x')    # 84E       3D0
 )
 
 (k, f) = zip(*layouts['venue'])
@@ -109,8 +108,7 @@ layouts['vehicle'] = (
     ('vehicle_track',      'H'),      # 11A       2         unit: mm
     ('vehicle_wheelbase',  'I'),      # 11C       4         unit: mm
     ('vehicle_comment',    '1028s'),  # 120       404
-    ('vehicle_number',     '64s'),    # 524       400
-    # ('', '1936x') # 790
+    ('vehicle_number',     '64s'),    # 524       40
 )
 
 (k, f) = zip(*layouts['vehicle'])
@@ -134,7 +132,6 @@ layouts['weather'] = (
     ('wind_speed_unit',  '8s'),     # B0        8
     ('wind_direction',   '64s'),    # B8        40
     ('weather_comment',  '1024s'),  # F8        400
-    # ('', '776x') # 308
 )
 
 (k, f) = zip(*layouts['weather'])
@@ -150,7 +147,7 @@ layouts['ch_meta'] = (
     ('next_ptr',         'I'),      # 4         4
     ('data_ptr',         'I'),      # 8         4
     ('sample_count',     'I'),      # C         4
-    ('?',                'I'),      # 10        4         0x00030004
+    ('magic1',           'I'),      # 10        4         196609
     ('size',             'H'),      # 14        2         2: s16 4: s32
     ('sample_rate',      'H'),      # 16        2
     ('offset',           'h'),      # 18        2
