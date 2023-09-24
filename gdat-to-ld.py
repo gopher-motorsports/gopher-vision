@@ -44,8 +44,15 @@ def encode(values):
         for value in values
     ]
 
-data = gdat.generate_data(parameters, 1000) # TEMP FAKE DATA
-channels = gdat.parse(data, parameters)
+# data = gdat.generate_data(parameters, 1000) # TEMP FAKE DATA
+# channels = gdat.parse(data, parameters)
+channels = {
+    1: {
+        'id': 1,
+        'name': 'Channel1',
+        'unit': 'C'
+    }
+}
 
 for ch in channels.values():
     # order must match ld.formats['ch_meta']
@@ -53,17 +60,20 @@ for ch in channels.values():
         'prev_ptr': 0,
         'next_ptr': 0,
         'data_ptr': 0,
-        'sample_count': len(ch['points']),
+        'sample_count': 1,
+        '?': 0x00030004,
         'size': 2,
         'sample_rate': 1,
         'offset': 0,
         'scalar': 1,
         'divisor': 1,
-        'shift': -1,
+        'shift': 1,
         'name': ch['name'],
-        'short_name': '',
+        'short_name': 'CH',
         'unit': ch['unit'],
     }
+
+    ch['data'] = [0]
 
 event_offset = struct.calcsize(ld.formats['header'])
 venue_offset = event_offset + struct.calcsize(ld.formats['event'])
@@ -76,7 +86,7 @@ data_offset = meta_offset + meta_size
 
 # order must match ld.formats['header']
 header_values = {
-    'sof': 8117488189504,
+    'sof': 64,
     'meta_ptr': meta_offset,
     'data_ptr': data_offset,
     'event_ptr': event_offset,
@@ -85,14 +95,15 @@ header_values = {
     'device_version': 560,
     'pro1': 128,
     'num_channels': len(channels),
-    'num_channels2': 0,
-    'date': '09/23/2023',
+    'num_channels2': len(channels),
+    'pro2': 327700,
+    'date': '29/09/2023',
     'time': '13:19:30',
     'driver': 'Driver',
     'vehicle_id': 'VehicleID',
     'engine_id': 'EngineID',
     'venue': 'Venue',
-    'pro2': 45126145,
+    'pro3': 45126145,
     'session': 'Session',
     'short_comment': 'Short Comment',
     'team': 'Team'
@@ -190,7 +201,11 @@ with open(opath, 'wb') as f:
     for ch in channels.values():
         if ch['meta']['size'] == 2: fmt = f"<h"
         elif ch['meta']['size'] == 4: fmt = f"<i"
-        data = struct.pack(fmt, 0) * ch['meta']['sample_count']
+
+        data = b''
+        for d in ch['data']:
+            data += struct.pack(fmt, d)
+
         f.write(data)
 
 print('done.')
