@@ -102,7 +102,6 @@ def parse(bytes, parameters):
             'id': id,
             'name': param['name'],
             'unit': param['unit'],
-            'type': param['type'],
             'points': []
         }
         for (id, param) in parameters.items()

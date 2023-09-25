@@ -44,19 +44,15 @@ def encode(values):
         for value in values
     ]
 
-# data = gdat.generate_data(parameters, 1000) # TEMP FAKE DATA
-# channels = gdat.parse(data, parameters)
-channels = {
-    1: {
-        'id': 1,
-        'name': 'Engine RPM',
-        'short_name': 'rpm',
-        'unit': '',
-        'data': [1000, 2000, 3000, 4000, 5000]
-    }
-}
+data = gdat.generate_data(parameters, 1000) # TEMP FAKE DATA
+channels = gdat.parse(data, parameters)
 
 for ch in channels.values():
+    # TODO:
+    # find appropriate sample rate, interpolate channel points with numpy
+    # scale data to s16 or s32
+    ch['data'] = [0, 1, 2, 3]
+
     # order must match ld.formats['ch_meta']
     ch['meta'] = {
         'prev_ptr': 0,
@@ -71,7 +67,7 @@ for ch in channels.values():
         'divisor': 1,
         'shift': 0,
         'name': ch['name'],
-        'short_name': ch['short_name'],
+        'short_name': '',
         'unit': ch['unit'],
     }
 
