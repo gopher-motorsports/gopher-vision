@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 pyyaml = "*"
 tabulate = "*"
+numpy = "*"
+matplotlib = "*"
 
 [dev-packages]
 
