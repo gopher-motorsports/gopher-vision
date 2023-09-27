@@ -34,9 +34,6 @@ print(f'read {len(data)} bytes of data')
 t0 = gdat.get_t0(sof)
 print(f"t0: {time.strftime('%m/%d/%Y %H:%M:%S', t0)}\n")
 
-# randomized data
-data = gdat.generate_data(parameters, 1000)
-
 channels = gdat.parse(data, parameters)
 
 chs = []
