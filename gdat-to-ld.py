@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 import struct
+import numpy as np
+
 import gdat
 import ld
 
@@ -44,14 +46,27 @@ def encode(values):
         for value in values
     ]
 
-data = gdat.generate_data(parameters, 1000) # TEMP FAKE DATA
 channels = gdat.parse(data, parameters)
 
 for ch in channels.values():
-    # TODO:
-    # find appropriate sample rate, interpolate channel points with numpy
-    # scale data to s16 or s32
-    ch['data'] = [0, 1, 2, 3]
+    if not ch['points']:
+        ch['data'] = [0]
+        sample_rate = 1
+    else:
+        points = np.array(ch['points'])
+
+        # get time and value of each point
+        t_old = points[:,0]
+        d_old = points[:,1]
+
+        # linearly interpolate for evenly-spaced samples beginning at t=0
+        t_new = np.linspace(0, t_old[-1], num=len(points))
+        d_new = np.interp(t_new, t_old, d_old)
+
+        # TODO: cleaner sample rates
+        sample_rate = len(d_new) / ((t_new[-1] - t_old[0]) / 1000)
+        # TODO: find appropriate type (s16/32), scalars, etc
+        ch['data'] = d_new.astype(np.int16) # TEMP FORCED CAST
 
     # order must match ld.formats['ch_meta']
     ch['meta'] = {
@@ -61,7 +76,7 @@ for ch in channels.values():
         'sample_count': len(ch['data']),
         'magic1': 196609,
         'size': 2,
-        'sample_rate': 1,
+        'sample_rate': int(sample_rate),
         'offset': 0,
         'scalar': 1,
         'divisor': 1,
