@@ -47,14 +47,19 @@ def load_parameters(config_path):
             if p['id'] in parameters:
                 print(f"WARNING: duplicate id ({p['id']})")
             else:
+                type = p.get('type')
+                if type is None:
+                    print(f'missing type: {p}')
+                    continue
+
                 parameters[p['id']] = {
                     'id': p['id'],
-                    'name': p['motec_name'],
-                    'unit': p['unit'],
-                    'type': p['type'],
-                    'size': types[p['type']]['size'],
-                    'format': types[p['type']]['format'],
-                    'signed': types[p['type']]['signed']
+                    'name': p.get('motec_name'),
+                    'unit': p.get('unit'),
+                    'type': type,
+                    'size': types[type]['size'],
+                    'format': types[type]['format'],
+                    'signed': types[type]['signed']
                 }
     return parameters
 
@@ -111,7 +116,7 @@ def parse(bytes, parameters):
         p = unescape(START + p)
         # verify packet size (w/o start delimiter)
         if len(p) < MIN_PACKET_LENGTH - 1:
-            print(f'packet too small: {p}')
+            # print(f'packet too small: {p}')
             errors += 1
             continue
         # split packet into components
@@ -120,14 +125,15 @@ def parse(bytes, parameters):
         data = p[7:-1]
         # verify checksum
         if not checksum(p):
-            print(f'invalid checksum: {p}')
+            # print(f'invalid checksum: {p}')
             errors += 1
             continue
         # decode data using parameter info
         try:
             data = struct.unpack(parameters[id]['format'], data)[0]
         except:
-            print(f'failed to decode packet data: {p}')
+            # print(f'failed to decode packet data: '
+            #       f"id: {id}, format: {parameters[id]['format']}, data: {data}")
             errors += 1
             continue
         # add to channel
