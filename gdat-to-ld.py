@@ -2,6 +2,8 @@ import sys
 from pathlib import Path
 import struct
 import numpy as np
+import matplotlib.pyplot as plt
+from fractions import Fraction
 
 import gdat
 import ld
@@ -25,8 +27,8 @@ if not ipath.is_file():
 if ipath.suffix != '.gdat':
     raise Exception('expected an input path to a .gdat file')
 
-if opath.is_file():
-    raise Exception(f'"{opath}" already exists')
+# if opath.is_file():
+#     raise Exception(f'"{opath}" already exists')
 
 if opath.suffix != '.ld':
     raise Exception('expected an output path to an .ld file')
@@ -48,25 +50,69 @@ def encode(values):
 
 channels = gdat.parse(data, parameters)
 
+print('adjusting data...\n')
 for ch in channels.values():
     if not ch['points']:
         ch['data'] = [0]
         sample_rate = 1
     else:
+        # TODO: do all this in channel generation
         points = np.array(ch['points'])
 
         # get time and value of each point
         t_old = points[:,0]
         d_old = points[:,1]
 
-        # linearly interpolate for evenly-spaced samples beginning at t=0
+        # linear interpolation - evenly-spaced samples from t=0 to final timestamp
         t_new = np.linspace(0, t_old[-1], num=len(points))
         d_new = np.interp(t_new, t_old, d_old)
 
-        # TODO: cleaner sample rates
-        sample_rate = len(d_new) / ((t_new[-1] - t_old[0]) / 1000)
-        # TODO: find appropriate type (s16/32), scalars, etc
+        sample_rate = round(len(d_new) / (t_new[-1] / 1000))
+        abs_max = max(d_new.max(), d_new.min(), key=abs)
+
         ch['data'] = d_new.astype(np.int16) # TEMP FORCED CAST
+
+        # find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
+        # value = encoded_value * 10^-shift * scalar / divisor
+        # encoded_value = value / 10^-shift / scalar * divisor
+        # to make the most of a s16: abs_max = (2^15 - 1) * 10^-shift * scalar / divisor
+        # keep shift high to preserve precision
+
+        for shift in range(10, -10, -1):
+            # calculate required scale to use this shift
+            scale = abs_max / (2**15-1) / 10**-shift
+            # convert scale to integer fraction
+            scalar, divisor = Fraction(scale).limit_denominator(2**15-1).as_integer_ratio()
+            if scalar <= 2**15-1:
+                # both scalar & divisor will fit in s16
+                break
+            else:
+                # adjust scalar to fit in s16 (adjust divisor too to maintain fraction)
+                adj = (2**15-1) / scalar
+                scalar = round(scalar * adj)
+                divisor = round(divisor * adj)
+                # check if divisor is still valid
+                if 1 <= divisor <= 2**15-1:
+                    # calculate % error with this new fraction to the ideal scale
+                    error = ((scalar / divisor) - scale) / scale
+                    # 10% is acceptable
+                    if error <= 0.1:
+                        break
+        else:
+            print(f"failed to represent ({abs_max}) in channel ({ch['id']} {ch['name']})")
+
+        if ch['id'] == 1:
+            print(abs_max, shift, scalar, divisor)
+            enc = lambda x: x / 10**-shift / scalar * divisor
+            dec = lambda x: x * 10**-shift * scalar / divisor
+            encoded_data = np.array(enc(d_new), dtype=np.int16)
+            decoded_data = dec(encoded_data)
+            plt.plot(t_old, d_old, 'o', label='points')
+            plt.plot(t_new, d_new, '-', label='interpolated')
+            plt.plot(t_new, decoded_data, '--', label='casted')
+            plt.legend(loc='best')
+            plt.show()
+            exit()
 
     # order must match ld.formats['ch_meta']
     ch['meta'] = {
@@ -78,13 +124,14 @@ for ch in channels.values():
         'size': 2,
         'sample_rate': int(sample_rate),
         'offset': 0,
-        'scalar': 1,
-        'divisor': 1,
-        'shift': 0,
+        'scalar': scalar,
+        'divisor': divisor,
+        'shift': shift,
         'name': ch['name'],
         'short_name': '',
         'unit': ch['unit'],
     }
+exit()
 
 event_offset = struct.calcsize(ld.formats['header'])
 venue_offset = event_offset + struct.calcsize(ld.formats['event'])
