@@ -139,7 +139,8 @@ keys['weather'] = tuple(filter(lambda key: key != '', k))
 formats['weather'] = ''.join(f)
 
 # CHANNEL METADATA =============================================================
-# value = (data / divisor * 10^-shift + offset) * scalar
+# value = encoded_value * 10^-shift * scalar / divisor
+# encoded_value = value / 10^-shift / scalar * divisor
 # offset wrt meta ptr
 layouts['ch_meta'] = (
 ###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)

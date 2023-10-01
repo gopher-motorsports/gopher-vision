@@ -73,6 +73,7 @@ if header['meta_ptr'] > 0:
         # parse channel metadata
         ch = parse(f, next_ch, keys['ch_meta'], formats['ch_meta'])
         ch['meta_ptr'] = next_ch
+        next_ch = ch['next_ptr']
         num_ch += 1
 
         if ch['name'] in ch_info:
@@ -86,17 +87,17 @@ if header['meta_ptr'] > 0:
             fmt = f"<{ch['sample_count']}i"
         else:
             print(f"\"{ch['name']}\" has unknown data size ({ch['size']})\n")
+            continue
 
         # jump to, unpack channel data
         f.seek(ch['data_ptr'])
         data = f.read(struct.calcsize(fmt))
         ch_data[ch['name']] = [
-            (x / ch['divisor'] * pow(10, ch['shift'] * -1) + ch['offset']) * ch['scalar']
+            x * pow(10, ch['shift'] * -1) * ch['scalar'] / ch['divisor']
             for x in struct.unpack(fmt, data)
         ]
 
         print(ch)
-        next_ch = ch['next_ptr']
 
     if num_ch == header['num_channels']:
         print(f'found {num_ch} channels\n')

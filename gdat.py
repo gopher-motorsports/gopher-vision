@@ -128,9 +128,11 @@ def parse(bytes, parameters):
             # print(f'invalid checksum: {p}')
             errors += 1
             continue
-        # decode data using parameter info
         try:
+            # decode data using parameter info
+            # store all data as floats (double precision in python)
             data = struct.unpack(parameters[id]['format'], data)[0]
+            data = float(data)
         except:
             # print(f'failed to decode packet data: '
             #       f"id: {id}, format: {parameters[id]['format']}, data: {data}")
