@@ -11,7 +11,9 @@ import time
 import yaml
 import struct
 import random
-import bisect
+import numpy as np
+from fractions import Fraction
+import matplotlib.pyplot as plt
 
 START = bytes.fromhex('7e')
 ESC = bytes.fromhex('7d')
@@ -107,7 +109,15 @@ def parse(bytes, parameters):
             'id': id,
             'name': param['name'],
             'unit': param['unit'],
-            'points': []
+            'points': [],
+            'raw': {
+                't': np.array([]),
+                'd': np.array([])
+            },
+            'interp': {
+                't': np.array([]),
+                'd': np.array([])
+            }
         }
         for (id, param) in parameters.items()
     }
@@ -141,9 +151,25 @@ def parse(bytes, parameters):
         # add to channel
         channels[id]['points'].append((ts, data))
 
-    # sort channel data by timestamp
     for id in channels:
+        # sort channel data by timestamp
         channels[id]['points'].sort(key=lambda pt: pt[0])
+        channels[id]['points'] = np.array(channels[id]['points'])
+
+        if channels[id]['points'].size:
+            # points w/ separated axes
+            t_old = channels[id]['points'][:,0]
+            d_old = channels[id]['points'][:,1]
+
+            channels[id]['raw']['t'] = t_old
+            channels[id]['raw']['d'] = d_old
+
+            # linear interpolation - evenly-spaced samples from t=0 to final timestamp
+            t_new = np.linspace(0, t_old[-1], num=len(t_old))
+            d_new = np.interp(t_new, t_old, d_old)
+
+            channels[id]['interp']['t'] = t_new
+            channels[id]['interp']['d'] = d_new
 
     print(f'parsed {len(bytes)} bytes, {len(packets)} packets, {errors} errors\n')
     return channels
@@ -171,3 +197,68 @@ def generate_data(parameters, nbytes):
         packet = generate_packet(param)
         b += escape(packet)
     return b
+
+# find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
+# value = encoded_value * 10^-shift * scalar / divisor
+# encoded_value = value / 10^-shift / scalar * divisor
+# to make the most of a s16: abs_max = (2^15 - 1) * 10^-shift * scalar / divisor
+# keep shift high to preserve precision
+def get_scalars(ch):
+    abs_max = max(ch['interp']['d'].max(), ch['interp']['d'].min(), key=abs)
+    # print(f"abs_max: {abs_max} index: {ch['interp']['d'].tolist().index(abs_max)}\n")
+    encodable = False
+
+    if abs_max == 0:
+        encodable = True
+        shift = 0
+        scalar = 1
+        divisor = 1
+        return (encodable, shift, scalar, divisor)
+
+    for shift in range(10, -10, -1):
+        # calculate required scale to use this shift
+        scale = abs_max / (2**15-1) / 10**-shift
+        # convert scale to integer fraction
+        scalar, divisor = Fraction(scale).limit_denominator(2**15-1).as_integer_ratio()
+        # print(f'\nshift: {shift} scale: {scale} scalar: {scalar} divisor: {divisor}')
+        if scalar == 0:
+            continue
+        elif -2**15 <= scalar <= 2**15-1:
+            # both scalar & divisor will fit in s16
+            encodable = True
+            break
+        else:
+            # adjust scalar to fit in s16 (adjust divisor too to maintain fraction)
+            adj = (2**15-1) / scalar
+            scalar = round(scalar * adj)
+            divisor = round(divisor * adj)
+            # check if divisor is still valid
+            if -2**15 <= divisor <= 2**15-1 and divisor != 0:
+                # max encoded value
+                enc_max = abs_max / 10**-shift / scalar * divisor
+                # % error with this new fraction to the ideal scale
+                error = ((scalar / divisor) - scale) / scale
+                # print(f'new_scale: {scalar / divisor} scalar: {scalar} divisor: {divisor} error: {error} enc_max: {enc_max}')
+                # 10% error is acceptable if encoded value fits
+                if enc_max <= 2**15-1 and error <= 0.1:
+                    encodable = True
+                    break
+    return (encodable, shift, scalar, divisor)
+
+def plot_channel(ch):
+    plt.plot(ch['raw']['t'], ch['raw']['d'], '.', label='data')
+    plt.plot(ch['interp']['t'], ch['interp']['d'], '-', label='interpolation')
+
+    (encodable, shift, scalar, divisor) = get_scalars(ch)
+
+    if not encodable:
+        print(f"failed to encode channel ({ch['id']} {ch['name']})")
+    else:
+        # print(f'shift: {shift} scalar: {scalar} divisor: {divisor}')
+        encoded = np.array([x / 10**-shift / scalar * divisor for x in ch['interp']['d']], dtype=np.int16)
+        decoded = [x * 10**-shift * scalar / divisor for x in encoded]
+        plt.plot(ch['interp']['t'], decoded, '--', label='decoded')
+
+    plt.ticklabel_format(useOffset=False)
+    plt.legend(loc='best')
+    plt.show()
