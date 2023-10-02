@@ -8,7 +8,6 @@
 # CHECKSUM = sum of bytes ignoring overflow (including start delimiter), calculated on unescaped packet
 
 import time
-import yaml
 import struct
 import random
 import numpy as np
@@ -27,43 +26,6 @@ def get_t0(sof):
         return time.strptime(sof.decode(), '/PLM_%Y-%m-%d-%H-%M-%S')
     except:
         return time.gmtime(0)
-    
-def load_parameters(config_path):
-    parameters = {}
-    types = {
-        'UNSIGNED8' : { 'signed': False, 'size': 1, 'format': '>B' },
-        'UNSIGNED16' : { 'signed': False, 'size': 2, 'format': '>H' },
-        'UNSIGNED32' : { 'signed': False, 'size': 4, 'format': '>I' },
-        'UNSIGNED64' : { 'signed': False, 'size': 8, 'format': '>Q' },
-        'SIGNED8' : { 'signed': True, 'size': 1, 'format': '>b' },
-        'SIGNED16' : { 'signed': True, 'size': 2, 'format': '>h' },
-        'SIGNED32' : { 'signed': True, 'size': 4, 'format': '>i' },
-        'SIGNED64' : { 'signed': True, 'size': 8, 'format': '>q' },
-        'FLOATING' : { 'signed': False, 'size': 4, 'format': '>f' }
-    }
-
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-        # build a new parameter dictionary
-        for p in config['parameters'].values():
-            if p['id'] in parameters:
-                print(f"WARNING: duplicate id ({p['id']})")
-            else:
-                type = p.get('type')
-                if type is None:
-                    print(f'missing type: {p}')
-                    continue
-
-                parameters[p['id']] = {
-                    'id': p['id'],
-                    'name': p.get('motec_name'),
-                    'unit': p.get('unit'),
-                    'type': type,
-                    'size': types[type]['size'],
-                    'format': types[type]['format'],
-                    'signed': types[type]['signed']
-                }
-    return parameters
 
 def escape(packet):
     p = START
@@ -98,29 +60,9 @@ def checksum(packet):
         sum += byte
     return (sum).to_bytes(2)[-1] == packet[-1]
 
-def parse(bytes, parameters):
-    print('parsing data...')
-
+def decode_packets(bytes, channels, parameters):
     packets = bytes.split(START)
     errors = 0
-
-    channels = {
-        id: {
-            'id': id,
-            'name': param['name'],
-            'unit': param['unit'],
-            'points': [],
-            'raw': {
-                't': np.array([]),
-                'd': np.array([])
-            },
-            'interp': {
-                't': np.array([]),
-                'd': np.array([])
-            }
-        }
-        for (id, param) in parameters.items()
-    }
 
     for p in packets:
         p = unescape(START + p)
@@ -139,40 +81,115 @@ def parse(bytes, parameters):
             errors += 1
             continue
         try:
-            # decode data using parameter info
+            # decode data using parameter format
             # store all data as floats (double precision in python)
-            data = struct.unpack(parameters[id]['format'], data)[0]
-            data = float(data)
+            value = float(struct.unpack(parameters[id]['format'], data)[0])
         except:
             # print(f'failed to decode packet data: '
             #       f"id: {id}, format: {parameters[id]['format']}, data: {data}")
             errors += 1
             continue
         # add to channel
-        channels[id]['points'].append((ts, data))
+        channels[id]['points'].append((ts, value))
 
-    for id in channels:
-        # sort channel data by timestamp
-        channels[id]['points'].sort(key=lambda pt: pt[0])
-        channels[id]['points'] = np.array(channels[id]['points'])
+    print(f'parsed {len(packets)} packets, {errors} errors')
 
-        if channels[id]['points'].size:
-            # points w/ separated axes
-            t_old = channels[id]['points'][:,0]
-            d_old = channels[id]['points'][:,1]
+# find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
+# value = encoded_value * 10^-shift * scalar / divisor
+# encoded_value = value / 10^-shift / scalar * divisor
+# to make the most of a s16: abs_max = (2^15 - 1) * 10^-shift * scalar / divisor
+def get_scalars(abs_max):
+    if abs_max == 0:
+        shift = 0
+        scalar = 1
+        divisor = 1
+        return (shift, scalar, divisor)
 
-            channels[id]['raw']['t'] = t_old
-            channels[id]['raw']['d'] = d_old
+    # start with high shift to preserve precision
+    for shift in range(10, -10, -1):
+        # calculate required scale to use this shift
+        scale = abs_max / (2**15-1) / 10**-shift
+        # convert scale to integer fraction
+        scalar, divisor = Fraction(scale).limit_denominator(2**15-1).as_integer_ratio()
+        if scalar == 0:
+            # scale can't be represented
+            continue
+        elif -2**15 <= scalar <= 2**15-1:
+            # both scalar & divisor will fit in s16
+            break
+        else:
+            # adjust scalar to fit in s16 (adjust divisor to maintain fraction)
+            adj = (2**15-1) / scalar
+            scalar = round(scalar * adj)
+            divisor = round(divisor * adj)
+            # check if divisor is still valid
+            if -2**15 <= divisor <= 2**15-1 and divisor != 0:
+                # max encoded value
+                enc_max = abs_max / 10**-shift / scalar * divisor
+                # % error with this new fraction to the ideal scale
+                error = ((scalar / divisor) - scale) / scale
+                # 10% error is acceptable
+                if enc_max <= 2**15-1 and error <= 0.1:
+                    break
+    else:
+        raise Exception(f'failed to find scalars for ({abs_max})')
 
-            # linear interpolation - evenly-spaced samples from t=0 to final timestamp
-            t_new = np.linspace(0, t_old[-1], num=len(t_old))
-            d_new = np.interp(t_new, t_old, d_old)
+    return (shift, scalar, divisor)
 
-            channels[id]['interp']['t'] = t_new
-            channels[id]['interp']['d'] = d_new
+def parse(bytes, parameters):
+    channels = {
+        id: {
+            'id': id,
+            'name': param['name'],
+            'unit': param['unit'],
+            'points': [],
+            'data': {
+                't_raw': None, # raw timestamps
+                'v_raw': None, # raw values
+                't_int': None, # interpolated timestamps
+                'v_int': None, # interpolated values
+            }
+        }
+        for (id, param) in parameters.items()
+    }
 
-    print(f'parsed {len(bytes)} bytes, {len(packets)} packets, {errors} errors\n')
+    # add datapoints to channels
+    decode_packets(bytes, channels, parameters)
+
+    for ch in channels.values():
+        if len(ch['points']):
+            # sort points by timestamp
+            ch['points'].sort(key=lambda pt: pt[0])
+            # seperate timestamp and values
+            ch['data']['t_raw'], ch['data']['v_raw'] = zip(*ch['points'])
+            # interpolate points from t=0 to t=last for evenly-spaced samples
+            ch['data']['t_int'] = np.linspace(0, ch['data']['t_raw'][-1], num=len(ch['data']['t_raw']))
+            ch['data']['v_int'] = np.interp(ch['data']['t_int'], ch['data']['t_raw'], ch['data']['v_raw'])
+
     return channels
+
+def plot(ch):
+    plt.suptitle(f"{ch['name']} (ID: {ch['id']})")
+    plt.title(f"{len(ch['data']['v_raw'])} points")
+    plt.xlabel('time (ms)')
+    plt.ylabel(ch['unit'])
+
+    plt.plot(ch['data']['t_raw'], ch['data']['v_raw'], '.', label='raw')
+    plt.plot(ch['data']['t_int'], ch['data']['v_int'], '-', label='interpolated')
+
+    # encode and decode values from s16
+    abs_max = max(ch['data']['v_int'].max(), ch['data']['v_int'].min(), key=abs)
+    try:
+        shift, scalar, divisor = get_scalars(abs_max)
+        encoded = np.array([v / 10**-shift / scalar * divisor for v in ch['data']['v_int']], dtype=np.int16)
+        decoded = [v * 10**-shift * scalar / divisor for v in encoded]
+        plt.plot(ch['data']['t_int'], decoded, '--', label='decoded')
+    except:
+        raise
+
+    plt.ticklabel_format(useOffset=False)
+    plt.legend(loc='best')
+    plt.show()
 
 def generate_packet(param):
     ts = int(time.time() * 1000 - start_ms)
@@ -197,68 +214,3 @@ def generate_data(parameters, nbytes):
         packet = generate_packet(param)
         b += escape(packet)
     return b
-
-# find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
-# value = encoded_value * 10^-shift * scalar / divisor
-# encoded_value = value / 10^-shift / scalar * divisor
-# to make the most of a s16: abs_max = (2^15 - 1) * 10^-shift * scalar / divisor
-# keep shift high to preserve precision
-def get_scalars(ch):
-    abs_max = max(ch['interp']['d'].max(), ch['interp']['d'].min(), key=abs)
-    # print(f"abs_max: {abs_max} index: {ch['interp']['d'].tolist().index(abs_max)}\n")
-    encodable = False
-
-    if abs_max == 0:
-        encodable = True
-        shift = 0
-        scalar = 1
-        divisor = 1
-        return (encodable, shift, scalar, divisor)
-
-    for shift in range(10, -10, -1):
-        # calculate required scale to use this shift
-        scale = abs_max / (2**15-1) / 10**-shift
-        # convert scale to integer fraction
-        scalar, divisor = Fraction(scale).limit_denominator(2**15-1).as_integer_ratio()
-        # print(f'\nshift: {shift} scale: {scale} scalar: {scalar} divisor: {divisor}')
-        if scalar == 0:
-            continue
-        elif -2**15 <= scalar <= 2**15-1:
-            # both scalar & divisor will fit in s16
-            encodable = True
-            break
-        else:
-            # adjust scalar to fit in s16 (adjust divisor too to maintain fraction)
-            adj = (2**15-1) / scalar
-            scalar = round(scalar * adj)
-            divisor = round(divisor * adj)
-            # check if divisor is still valid
-            if -2**15 <= divisor <= 2**15-1 and divisor != 0:
-                # max encoded value
-                enc_max = abs_max / 10**-shift / scalar * divisor
-                # % error with this new fraction to the ideal scale
-                error = ((scalar / divisor) - scale) / scale
-                # print(f'new_scale: {scalar / divisor} scalar: {scalar} divisor: {divisor} error: {error} enc_max: {enc_max}')
-                # 10% error is acceptable if encoded value fits
-                if enc_max <= 2**15-1 and error <= 0.1:
-                    encodable = True
-                    break
-    return (encodable, shift, scalar, divisor)
-
-def plot_channel(ch):
-    plt.plot(ch['raw']['t'], ch['raw']['d'], '.', label='data')
-    plt.plot(ch['interp']['t'], ch['interp']['d'], '-', label='interpolation')
-
-    (encodable, shift, scalar, divisor) = get_scalars(ch)
-
-    if not encodable:
-        print(f"failed to encode channel ({ch['id']} {ch['name']})")
-    else:
-        # print(f'shift: {shift} scalar: {scalar} divisor: {divisor}')
-        encoded = np.array([x / 10**-shift / scalar * divisor for x in ch['interp']['d']], dtype=np.int16)
-        decoded = [x * 10**-shift * scalar / divisor for x in encoded]
-        plt.plot(ch['interp']['t'], decoded, '--', label='decoded')
-
-    plt.ticklabel_format(useOffset=False)
-    plt.legend(loc='best')
-    plt.show()
