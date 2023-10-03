@@ -142,13 +142,13 @@ def parse(bytes, parameters):
             'id': id,
             'name': param['name'],
             'unit': param['unit'],
-            'sample_rate': None,
             # scalars to encode in s16
-            'shift': None,
-            'scalar': None,
-            'divisor': None,
-            'offset': None,
+            'shift': 0,
+            'scalar': 0,
+            'divisor': 0,
+            'offset': 0,
             # data
+            'sample_rate': 0,
             'points': [],
             'data': {
                 't_raw': None, # raw timestamps
@@ -164,6 +164,7 @@ def parse(bytes, parameters):
     # add datapoints to channels
     decode_packets(bytes, channels, parameters)
 
+    print('interpolating data...')
     for ch in channels.values():
         if len(ch['points']):
             # sort points by timestamp
@@ -178,12 +179,16 @@ def parse(bytes, parameters):
     return channels
 
 def encode_channel(ch):
-    abs_max = max(ch['data']['v_int'].max(), ch['data']['v_int'].min(), key=abs)
-    ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(abs_max)
-    ch['enc'] = np.array(
-        [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['data']['v_int']],
-        dtype=np.int16
-    )
+    if ch['data']['v_enc'] is None:
+        if ch['data']['v_int'] is None:
+            ch['data']['v_enc'] = []
+        else:
+            abs_max = max(ch['data']['v_int'].max(), ch['data']['v_int'].min(), key=abs)
+            ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(abs_max)
+            ch['data']['v_enc'] = np.array(
+                [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['data']['v_int']],
+                dtype=np.int16
+            )
 
 def plot(ch):
     plt.suptitle(f"{ch['name']} (ID: {ch['id']})")
@@ -195,7 +200,7 @@ def plot(ch):
     plt.plot(ch['data']['t_int'], ch['data']['v_int'], '-', label='interpolated')
 
     encode_channel(ch)
-    decoded = [v * 10**-ch['shift'] * ch['scalar'] / ch['divisor'] for v in ch['enc']]
+    decoded = [v * 10**-ch['shift'] * ch['scalar'] / ch['divisor'] for v in ch['data']['v_enc']]
     plt.plot(ch['data']['t_int'], decoded, '--', label='decoded')
 
     plt.ticklabel_format(useOffset=False)

@@ -21,7 +21,9 @@ info()         print basic info on currently loaded data
 info_config()  print detailed info on a loaded GopherCAN config
 info_gdat()    print detailed info on a loaded .gdat file
 info_ld()      print detailed info on a loaded .ld file
-plot(id)       plot .gdat channel data
+plot_gdat(id)  plot .gdat channel data
+plot_ld(name)  plot .ld channel data
+convert(path)  convert the currently loaded .gdat to a .ld at "path"
 help()         print available commands
 exit()         exit the console
 -------------  -----------------------------------------------------------------------------

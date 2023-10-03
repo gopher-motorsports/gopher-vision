@@ -169,6 +169,28 @@ def plot_ld(name):
     else:
         ld.plot(ld_channels[name])
 
+def convert(path):
+    path = Path(path)
+    if path.is_file():
+        print(f'"{path}" already exists')
+        return
+    if not path.suffix == '.ld':
+        print(f'path must lead to a .ld file')
+        return
+    if not paths['gdat']:
+        print('no .gdat loaded')
+        return
+    if not len(gdat_channels):
+        print('no gdat channels to convert')
+        return
+    
+    print('encoding channels...')
+    for ch in gdat_channels.values():
+        gdat.encode_channel(ch)
+    
+    print(f"converting {paths['gdat'].name} to .ld ...")
+    ld.write(path, gdat_channels)
+
 def help():
     commands = [
         ['load(path)', 'load a .gdat, .ld, or GopherCAN config (.yaml) into memory and parse the data'],
@@ -178,6 +200,7 @@ def help():
         ['info_ld()', 'print detailed info on a loaded .ld file'],
         ['plot_gdat(id)', 'plot .gdat channel data'],
         ['plot_ld(name)', 'plot .ld channel data'],
+        ['convert(path)', 'convert the currently loaded .gdat to a .ld at "path"'],
         ['help()', 'print available commands'],
         ['exit()', 'exit the console']
     ]

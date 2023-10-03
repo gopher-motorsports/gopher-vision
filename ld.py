@@ -260,3 +260,156 @@ def plot(ch):
 
     plt.ticklabel_format(useOffset=False)
     plt.show()
+
+def write(path, channels):
+    event_offset = struct.calcsize(formats['header'])
+    venue_offset = event_offset + struct.calcsize(formats['event'])
+    vehicle_offset = venue_offset + struct.calcsize(formats['venue'])
+    weather_offset = vehicle_offset + struct.calcsize(formats['vehicle'])
+    meta_offset = weather_offset + struct.calcsize(formats['weather'])
+
+    ch_meta_size = struct.calcsize(formats['ch_meta'])
+    meta_size = len(channels) * ch_meta_size
+    data_offset = meta_offset + meta_size
+
+    # order must match formats['header']
+    header_values = {
+        'sof': 7567732375616,
+        'meta_ptr': meta_offset,
+        'data_ptr': data_offset,
+        'event_ptr': event_offset,
+        'magic1': 15,
+        'device_serial': 21115,
+        'device_type': 'ADL',
+        'device_version': 560,
+        'magic2': 128,
+        'num_channels': len(channels),
+        'num_channels2': len(channels),
+        'magic3': 66036,
+        'date': '03/10/2021',
+        'time': '13:19:30',
+        'driver': 'Driver',
+        'vehicle_id': 'VehicleID',
+        'engine_id': 'EngineID',
+        'venue': 'Venue',
+        'magic4': 45126145,
+        'session': 'Session',
+        'short_comment': 'ShortComment',
+        'team': 'Team'
+    }
+
+    # order must match formats['event']
+    event_values = {
+        'event': 'Event',
+        'session': 'Session',
+        'long_comment': 'LongComment',
+        'venue_ptr': venue_offset,
+        'weather_ptr': weather_offset
+    }
+
+    # order must match formats['venue']
+    venue_values = {
+        'venue': 'Venue',
+        'venue_length': 420000,
+        'vehicle_ptr': vehicle_offset,
+        'venue_category': 'Category'
+    }
+
+    # order must match formats['vehicle']
+    vehicle_values = {
+        'vehicle_id': 'VehicleID',
+        'vehicle_desc': 'VehicleDescription',
+        'engine_id': 'EngineID',
+        'vehicle_weight': 100,
+        'fuel_tank': 2000,
+        'vehicle_type': 'VehicleType',
+        'driver_type': 'DriveType',
+        'diff_ratio': 41248,
+        'gear1': 1000,
+        'gear2': 2000,
+        'gear3': 3000,
+        'gear4': 4000,
+        'gear5': 5000,
+        'gear6': 6000,
+        'gear7': 7000,
+        'gear8': 8000,
+        'gear9': 9000,
+        'gear10': 10000,
+        'vehicle_track': 300,
+        'vehicle_wheelbase': 400,
+        'vehicle_comment': 'VehicleComment',
+        'vehicle_number': 'VehicleNumber'
+    }
+
+    # order must match formats['weather']
+    weather_values = {
+        'sky': 'Sunny',
+        'air_temp': '200',
+        'air_temp_unit': 'C',
+        'track_temp': '100',
+        'track_temp_unit': 'C',
+        'pressure': '3',
+        'pressure_unit': 'bar',
+        'humidity': '40',
+        'humidity_unit': '%',
+        'wind_speed': '50',
+        'wind_speed_unit': 'km/h',
+        'wind_direction': 'WindDirection',
+        'weather_comment': 'WeatherComment'
+    }
+
+    def enc_str(values):
+        return [
+            value.encode() if type(value) is str else value
+            for value in values
+        ]
+
+    print('packing metadata...')
+    header = struct.pack(formats['header'], *enc_str(header_values.values()))
+    event = struct.pack(formats['event'], *enc_str(event_values.values()))
+    venue = struct.pack(formats['venue'], *enc_str(venue_values.values()))
+    vehicle = struct.pack(formats['vehicle'], *enc_str(vehicle_values.values()))
+    weather = struct.pack(formats['weather'], *enc_str(weather_values.values()))
+
+    print(f'writing to {path} ...')
+    with open(path, 'wb') as f:
+        f.write(header + event + venue + vehicle + weather)
+
+        channel_metadata = b''
+        data_size = 0
+        for i, ch in enumerate(channels.values()):
+            ch_meta = {
+                'prev_ptr': 0,
+                'next_ptr': 0,
+                'data_ptr': 0,
+                'sample_count': len(ch['data']['v_enc']),
+                'magic1': 196609,
+                'size': 2,
+                'sample_rate': ch['sample_rate'],
+                'offset': ch['offset'],
+                'scalar': ch['scalar'],
+                'divisor': ch['divisor'],
+                'shift': ch['shift'],
+                'name': ch['name'],
+                'short_name': '',
+                'unit': ch['unit'],
+            }
+            ch_meta['data_ptr'] = data_offset + data_size
+            data_size += ch_meta['sample_count'] * ch_meta['size']
+
+            if i == 0: ch_meta['prev_ptr'] = 0
+            else: ch_meta['prev_ptr'] = meta_offset + ch_meta_size * (i - 1)
+
+            if i == len(channels) - 1: ch_meta['next_ptr'] = 0
+            else: ch_meta['next_ptr'] = meta_offset + ch_meta_size * (i + 1)
+
+            channel_metadata += struct.pack(formats['ch_meta'], *enc_str(ch_meta.values()))
+
+        f.write(channel_metadata)
+
+        for ch in channels.values():
+            data = b''
+            for v in ch['data']['v_enc']:
+                # assumes data has been encoded for a s16
+                data += struct.pack("<h", v)
+            f.write(data)
