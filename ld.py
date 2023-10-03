@@ -10,6 +10,8 @@
 # OFFSET (hex): file offset of the value
 # LENGTH (hex): length of the value in bytes
 
+import struct
+
 layouts = {}
 keys = {}
 formats = {}
@@ -165,3 +167,81 @@ layouts['ch_meta'] = (
 (k, f) = zip(*layouts['ch_meta'])
 keys['ch_meta'] = tuple(filter(lambda key: key != '', k))
 formats['ch_meta'] = ''.join(f)
+
+# .ld OPERATIONS ===============================================================
+
+# unpack a section of an .ld file
+def unpack(file, offset, keys, format):
+    file.seek(offset)
+    data = file.read(struct.calcsize(format))
+    # unpack bytes according to format, decoding & trimming strings
+    values = [
+        value.decode().strip().strip('\0') if type(value) is bytes
+        else value
+        for value in struct.unpack(format, data)
+    ]
+    # combine keys & values into a dictionary, ignoring empty keys
+    return {k:v for k,v in zip(keys, values) if k != ''}
+
+def parse(path):
+    metadata = {}
+    channels = {}
+    f = open(path, 'rb')
+
+    metadata['header'] = unpack(f, 0, keys['header'], formats['header'])
+
+    if metadata['header']['event_ptr'] > 0:
+        metadata['event'] = unpack(f, metadata['header']['event_ptr'], keys['event'], formats['event'])
+    else: print('no event_ptr')
+
+    if metadata['event']['venue_ptr'] > 0:
+        metadata['venue'] = unpack(f, metadata['event']['venue_ptr'], keys['venue'], formats['venue'])
+    else: print('no venue_ptr')
+
+    if metadata['venue']['vehicle_ptr'] > 0:
+        metadata['vehicle'] = unpack(f, metadata['venue']['vehicle_ptr'], keys['vehicle'], formats['vehicle'])
+    else: print('no vehicle_ptr')
+
+    if metadata['event']['weather_ptr'] > 0:
+        metadata['weather'] = unpack(f, metadata['event']['weather_ptr'], keys['weather'], formats['weather'])
+    else: print('no weather_ptr')
+
+    if metadata['header']['meta_ptr'] > 0:
+        next_ch = metadata['header']['meta_ptr']
+        while next_ch:
+            ch = unpack(f, next_ch, keys['ch_meta'], formats['ch_meta'])
+            ch['meta_ptr'] = next_ch
+            next_ch = ch['next_ptr']
+
+            # check for duplicate channel
+            if ch['name'] in channels:
+                print(f"found duplicate channel: \"{ch['name']}\"")
+                continue
+            else:
+                channels[ch['name']] = ch
+
+            # get format for entire data section
+            if ch['size'] == 2:
+                data_fmt = f"<{ch['sample_count']}h"
+            elif ch['size'] == 4:
+                data_fmt = f"<{ch['sample_count']}i"
+            else:
+                print(f"\"{ch['name']}\" has unknown data size ({ch['size']})")
+                continue
+
+            # jump to and unpack channel data
+            f.seek(ch['data_ptr'])
+            data = f.read(struct.calcsize(data_fmt))
+            channels[ch['name']]['data'] = [
+                v * 10**-ch['shift'] * ch['scalar'] / ch['divisor']
+                for v in struct.unpack(data_fmt, data)
+            ]
+
+        if len(channels) != metadata['header']['num_channels']:
+            print(f"WARNING: num_channels ({metadata['header']['num_channels']})",
+                  f"does not match number of channels found ({len(channels)})\n")
+            
+    else: print('no meta_pr')
+
+    f.close()
+    return (metadata, channels)

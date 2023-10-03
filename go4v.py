@@ -6,6 +6,7 @@ from tabulate import tabulate
 import yaml
 
 import gdat
+import ld
 
 paths = {
     'config': None,
@@ -14,7 +15,9 @@ paths = {
 }
 
 parameters = {}
-channels = {}
+gdat_channels = {}
+ld_metadata = {}
+ld_channels = {}
 
 def load_config(path):
     global parameters
@@ -54,7 +57,9 @@ def load_config(path):
             }
 
 def load(path):
-    global channels
+    global gdat_channels
+    global ld_metadata
+    global ld_channels
     
     path = Path(path)
     if not path.is_file():
@@ -69,7 +74,6 @@ def load(path):
         case '.yaml':
             load_config(path)
             print(f'loaded {len(parameters)} parameters')
-            print('done')
             paths['config'] = path
         case '.gdat':
             if not len(parameters):
@@ -78,18 +82,20 @@ def load(path):
                 (sof, ext, data) = path.read_bytes().partition(b'.gdat:')
                 print(f'read {len(data)} bytes of data')
                 print('parsing data...')
-                channels = gdat.parse(data, parameters)
-                print(f'created {len(channels)} channels')
-                print('done')
+                gdat_channels = gdat.parse(data, parameters)
+                print(f'created {len(gdat_channels)} channels')
                 paths['gdat'] = path
         case '.ld':
-            pass
+            print('parsing data...')
+            ld_metadata, ld_channels = ld.parse(path)
+            print(f"loaded {len(ld_channels)} channels")
+            paths['ld'] = path
 
 def info():
     info = [
         ['config', paths['config'] or 'not loaded', f'{len(parameters)} parameters'],
-        ['gdat', paths['gdat'] or 'not loaded', f'{len(channels)} channels'],
-        ['ld', paths['ld'] or 'not loaded', '']
+        ['gdat', paths['gdat'] or 'not loaded', f'{len(gdat_channels)} channels'],
+        ['ld', paths['ld'] or 'not loaded', f'{len(ld_channels)} channels']
     ]
     print(tabulate(info))
 
@@ -104,9 +110,9 @@ def info_config():
 def info_gdat():
     if paths['gdat']:
         print(f"gdat path: {paths['gdat']}")
-        print(f'{len(channels)} channels\n')
+        print(f'{len(gdat_channels)} channels\n')
         ch_info = []
-        for channel in channels.values():
+        for channel in gdat_channels.values():
             # exclude a few keys from the table
             ch = {k:v for k,v in channel.items() if k not in ['points', 'data']}
             ch['points'] = len(channel['points'])
@@ -117,17 +123,43 @@ def info_gdat():
 
 def info_ld():
     if paths['ld']:
-        print(f"ld path: {paths['ld']}")
+        print(f"ld path: {paths['ld']}\n")
+        print('HEADER')
+        print(tabulate(ld_metadata['header'].items()))
+        print('EVENT')
+        print(tabulate(ld_metadata['event'].items()))
+        print('VENUE')
+        print(tabulate(ld_metadata['venue'].items()))
+        print('VEHICLE')
+        print(tabulate(ld_metadata['vehicle'].items()))
+        print('WEATHER')
+        print(tabulate(ld_metadata['weather'].items()))
+        print('CHANNELS')
+        ch_info = []
+        for ch in ld_channels.values():
+            ch_info.append({
+                'meta_ptr': hex(ch['meta_ptr']),
+                'data_ptr': hex(ch['data_ptr']),
+                'size': ch['size'],
+                'name': ch['name'],
+                'sample_rate': ch['sample_rate'],
+                'sample_count': ch['sample_count'],
+                'shift': ch['shift'],
+                'scalar': ch['scalar'],
+                'divisor': ch['divisor'],
+                'offset': ch['offset'],
+            })
+        print(tabulate(ch_info, headers='keys'))
     else:
         print('no .ld loaded')
 
 def plot(id):
-    if not len(channels):
+    if not len(gdat_channels):
         print('please load a .gdat first')
-    elif not id in channels:
+    elif not id in gdat_channels:
         print(f'channel ({id}) does not exist')
     else:
-        gdat.plot(channels[id])
+        gdat.plot(gdat_channels[id])
 
 def help():
     commands = [
