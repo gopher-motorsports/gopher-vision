@@ -153,13 +153,21 @@ def info_ld():
     else:
         print('no .ld loaded')
 
-def plot(id):
+def plot_gdat(id):
     if not len(gdat_channels):
         print('please load a .gdat first')
     elif not id in gdat_channels:
         print(f'channel ({id}) does not exist')
     else:
         gdat.plot(gdat_channels[id])
+
+def plot_ld(name):
+    if not len(ld_channels):
+        print('please load a .ld first')
+    elif not name in ld_channels:
+        print(f'channel ({name}) does not exist')
+    else:
+        ld.plot(ld_channels[name])
 
 def help():
     commands = [
@@ -168,7 +176,8 @@ def help():
         ['info_config()', 'print detailed info on a loaded GopherCAN config'],
         ['info_gdat()', 'print detailed info on a loaded .gdat file'],
         ['info_ld()', 'print detailed info on a loaded .ld file'],
-        ['plot(id)', 'plot .gdat channel data'],
+        ['plot_gdat(id)', 'plot .gdat channel data'],
+        ['plot_ld(name)', 'plot .ld channel data'],
         ['help()', 'print available commands'],
         ['exit()', 'exit the console']
     ]

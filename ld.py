@@ -11,6 +11,8 @@
 # LENGTH (hex): length of the value in bytes
 
 import struct
+import numpy as np
+import matplotlib.pyplot as plt
 
 layouts = {}
 keys = {}
@@ -245,3 +247,16 @@ def parse(path):
 
     f.close()
     return (metadata, channels)
+
+def plot(ch):
+    plt.suptitle(ch['name'])
+    plt.title(f"{ch['sample_count']} samples, {ch['sample_rate']}Hz")
+    plt.xlabel('time (s)')
+    plt.ylabel(ch['unit'])
+
+    period = 1 / ch['sample_rate']
+    t = np.arange(0, ch['sample_count']) * period
+    plt.plot(t, ch['data'], '.')
+
+    plt.ticklabel_format(useOffset=False)
+    plt.show()
