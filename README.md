@@ -1,4 +1,4 @@
-GopherVision is a collection of Python (3.11) utilities for interacting with Gopher Motorsports data.
+**GopherVision** is a collection of Python (3.11) utilities for interacting with Gopher Motorsports data.
 
 ## Installation
 ```
@@ -31,4 +31,56 @@ exit()         exit the console
 
 **WARNING:** Backslashes in path arguments must be escaped. Use `load("configs\\go4-23c.yaml")` instead of `load("configs\go4-23c.yaml")`.
 
-Using a console enables users to load data once, then inspect and plot channels at will without running a script again / reloading.
+A console interface enables some useful workflows like:
+
+1. Loading a .gdat file and the associated GopherCAN config:
+```
+Welcome to Gopher Vision! (Python 3.11.3)
+run help() to print available commands
+>>> load("...\\gophercan-lib\\network_autogen\\configs\\go4-23c.yaml")
+loading go4-23c.yaml ...
+building parameter dictionary...
+loaded 108 parameters
+>>> load("9-17-IC.gdat")
+loading 9-17-IC.gdat ...
+read 25003214 bytes of data
+parsing data...
+parsed 2108461 packets, 1367 errors
+interpolating data...
+created 108 channels
+```
+
+2. Then converting to a .ld:
+```
+>>> convert("9-17-IC.ld")
+encoding channels...
+converting 9-17-IC.gdat to .ld ...
+packing metadata...
+writing to 9-17-IC.ld ...
+```
+
+3. Finding an interesting channel:
+
+<p align="center">
+  <img width="500" src="img/i2.png">
+</p>
+
+4. And inspecting how the raw, interpolated, and encoded/decoded data series compare:
+
+```
+>>> info_gdat()
+gdat path: 9-17-IC.gdat
+108 channels
+
+  id  name                          unit      shift    scalar    divisor    offset    sample_rate    points
+----  ----------------------------  ------  -------  --------  ---------  --------  -------------  --------
+   1  Engine RPM                    rpm           4     32767         18         0            199     48154
+   ...
+
+>>> plot_gdat(1)
+```
+
+<p align="center">
+  <img width="500" src="img/plot.png">
+  <img width="500" src="img/plot-zoomed.png">
+</p>
