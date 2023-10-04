@@ -28,29 +28,29 @@ def get_t0(sof):
         return time.gmtime(0)
 
 def escape(packet):
-    p = START
+    p = bytearray(START)
     for b in packet[1:]:
         if b == int.from_bytes(ESC) or b == int.from_bytes(START):
             # add 7D control byte with escaped byte
-            p += ESC
-            p += (b ^ 0x20).to_bytes()
+            p.append(ESC)
+            p.append(b ^ 0x20)
         else:
             # add raw byte
-            p += (b).to_bytes()
+            p.append(b)
     return p
 
 def unescape(packet):
-    p = b''
+    p = bytearray()
     i = 0
     while i < len(packet):
         if packet[i] == int.from_bytes(ESC):
             # skip 7D control byte, unescape next byte
             i += 1
             if i >= len(packet): break
-            p += (packet[i] ^ 0x20).to_bytes()
+            p.append(packet[i] ^ 0x20)
         else:
             # add raw byte
-            p += packet[i].to_bytes()
+            p.append(packet[i])
         i += 1
     return p
 
