@@ -223,18 +223,27 @@ if __name__ == '__main__':
         shell.interact(banner=banner)
 
     # python go4v.py convert *.yaml path/to/*.gdat
+    # python go4v.py convert *.yaml path/to/folder/
     elif sys.argv[1] == 'convert' and len(sys.argv) == 4:
-        config_name = sys.argv[2]
-        gdat_path = sys.argv[3]
         # assumes GopherCAN is in a sibling directory
+        config_name = sys.argv[2]
         config_path = Path('../gophercan-lib/network_autogen/configs/') / config_name
-        # output .ld next to the gdat with the same name
-        ld_path = Path(gdat_path).with_suffix('.ld')
-        # load config and gdat
         load(config_path)
-        load(gdat_path)
-        # convert
-        convert(ld_path)
+
+        def convert_single(gdat_path):
+            load(gdat_path)
+            # output .ld next to the gdat with the same name
+            ld_path = Path(gdat_path).with_suffix('.ld')
+            convert(ld_path)
+
+        # gdat path could be a single file or a folder
+        gdat_path = Path(sys.argv[3])
+        if gdat_path.is_file():
+            convert_single(gdat_path)
+        elif gdat_path.is_dir():
+            for file_path in gdat_path.iterdir():
+                if (file_path.suffix == '.gdat'):
+                    convert_single(file_path)
 
     # unknown argument pattern, default to shell
     else:

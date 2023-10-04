@@ -115,3 +115,8 @@ This shortcut assumes the GopherCAN config exists in a sibling directory:
 ```
 
 The .ld file will be output next to the .gdat.
+
+You can also convert an entire folder of .gdat files:
+```
+python go4v.py convert go4-23c.yaml data/
+```
