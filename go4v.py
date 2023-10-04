@@ -1,6 +1,7 @@
 import code
 import platform
 from pathlib import Path
+import time
 
 from tabulate import tabulate
 import yaml
@@ -15,6 +16,7 @@ paths = {
 }
 
 parameters = {}
+gdat_t0 = None
 gdat_channels = {}
 ld_metadata = {}
 ld_channels = {}
@@ -57,6 +59,7 @@ def load_config(path):
             }
 
 def load(path):
+    global gdat_t0
     global gdat_channels
     global ld_metadata
     global ld_channels
@@ -82,6 +85,8 @@ def load(path):
                 (sof, ext, data) = path.read_bytes().partition(b'.gdat:')
                 print(f'read {len(data)} bytes of data')
                 print('parsing data...')
+                gdat_t0 = gdat.get_t0(sof)
+                print(f"t0: {time.asctime(gdat_t0)}")
                 gdat_channels = gdat.parse(data, parameters)
                 print(f'created {len(gdat_channels)} channels')
                 paths['gdat'] = path
@@ -110,6 +115,7 @@ def info_config():
 def info_gdat():
     if paths['gdat']:
         print(f"gdat path: {paths['gdat']}")
+        print(f"t0: {time.asctime(gdat_t0)}")
         print(f'{len(gdat_channels)} channels\n')
         ch_info = []
         for channel in gdat_channels.values():
@@ -189,7 +195,7 @@ def convert(path):
         gdat.encode_channel(ch)
     
     print(f"converting {paths['gdat'].name} to .ld ...")
-    ld.write(path, gdat_channels)
+    ld.write(path, gdat_channels, gdat_t0)
 
 def help():
     commands = [

@@ -11,6 +11,7 @@
 # LENGTH (hex): length of the value in bytes
 
 import struct
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -261,7 +262,7 @@ def plot(ch):
     plt.ticklabel_format(useOffset=False)
     plt.show()
 
-def write(path, channels):
+def write(path, channels, t0):
     event_offset = struct.calcsize(formats['header'])
     venue_offset = event_offset + struct.calcsize(formats['event'])
     vehicle_offset = venue_offset + struct.calcsize(formats['venue'])
@@ -286,8 +287,8 @@ def write(path, channels):
         'num_channels': len(channels),
         'num_channels2': len(channels),
         'magic3': 66036,
-        'date': '03/10/2021',
-        'time': '13:19:30',
+        'date': time.strftime('%d/%m/%Y', t0),
+        'time': time.strftime('%H:%M:%S', t0),
         'driver': 'Driver',
         'vehicle_id': 'VehicleID',
         'engine_id': 'EngineID',
