@@ -89,7 +89,6 @@ def load(path):
                 print(f"t0: {time.asctime(gdat_t0)}")
                 print('parsing data...')
                 gdat_channels = gdat.parse(data, parameters)
-                print(f'created {len(gdat_channels)} channels')
                 paths['gdat'] = path
         case '.ld':
             print('parsing data...')
@@ -191,9 +190,12 @@ def convert(path):
         print('no gdat channels to convert')
         return
     
-    print('encoding channels...')
+    print('encoding channels... ', end='')
+    start = time.time()
     for ch in gdat_channels.values():
         gdat.encode_channel(ch)
+    elapsed = round(time.time() - start, 2)
+    print(f'({elapsed}s)')
     
     print(f"converting {paths['gdat'].name} to .ld ...")
     ld.write(path, gdat_channels, gdat_t0)
@@ -225,6 +227,7 @@ if __name__ == '__main__':
     # python go4v.py convert *.yaml path/to/*.gdat
     # python go4v.py convert *.yaml path/to/folder/
     elif sys.argv[1] == 'convert' and len(sys.argv) == 4:
+        start = time.time()
         # assumes GopherCAN is in a sibling directory
         config_name = sys.argv[2]
         config_path = Path('../gophercan-lib/network_autogen/configs/') / config_name
@@ -244,6 +247,9 @@ if __name__ == '__main__':
             for file_path in gdat_path.iterdir():
                 if (file_path.suffix == '.gdat'):
                     convert_single(file_path)
+
+        elapsed = round(time.time() - start, 2)
+        print(f'\nfinished in {elapsed}s')
 
     # unknown argument pattern, default to shell
     else:

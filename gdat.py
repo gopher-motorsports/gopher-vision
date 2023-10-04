@@ -61,6 +61,7 @@ def checksum(packet):
     return (sum).to_bytes(2)[-1] == packet[-1]
 
 def decode_packets(bytes, channels, parameters):
+    start = time.time()
     packets = bytes.split(START)
     errors = 0
 
@@ -92,7 +93,8 @@ def decode_packets(bytes, channels, parameters):
         # add to channel
         channels[id]['points'].append((ts, value))
 
-    print(f'parsed {len(packets)} packets, {errors} errors')
+    elapsed = round(time.time() - start, 2)
+    print(f'parsed {len(packets)} packets, {errors} errors ({elapsed}s)')
 
 # find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
 # value = encoded_value * 10^-shift * scalar / divisor
@@ -164,7 +166,8 @@ def parse(bytes, parameters):
     # add datapoints to channels
     decode_packets(bytes, channels, parameters)
 
-    print('interpolating data...')
+    print('interpolating data... ', end='')
+    start = time.time()
     for ch in channels.values():
         if len(ch['points']):
             # sort points by timestamp
@@ -175,7 +178,10 @@ def parse(bytes, parameters):
             ch['data']['t_int'] = np.linspace(0, ch['data']['t_raw'][-1], num=len(ch['data']['t_raw']))
             ch['data']['v_int'] = np.interp(ch['data']['t_int'], ch['data']['t_raw'], ch['data']['v_raw'])
             ch['sample_rate'] = round(len(ch['data']['v_int']) / (ch['data']['t_int'][-1] / 1000))
-
+    elapsed = round(time.time() - start, 2)
+    print(f'({elapsed}s)')
+    
+    print(f'created {len(channels)} channels')
     return channels
 
 def encode_channel(ch):
