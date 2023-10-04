@@ -380,7 +380,7 @@ def write(path, channels, t0):
             'prev_ptr': 0,
             'next_ptr': 0,
             'data_ptr': 0,
-            'sample_count': len(ch['data']['v_enc']),
+            'sample_count': len(ch['v_enc']),
             'magic1': 196609,
             'size': 2,
             'sample_rate': ch['sample_rate'],
@@ -412,5 +412,5 @@ def write(path, channels, t0):
         print('writing data...')
         for ch in channels.values():
             # assumes data has been encoded for a s16
-            data = struct.pack(f"<{len(ch['data']['v_enc'])}h", *ch['data']['v_enc'])
+            data = struct.pack(f"<{len(ch['v_enc'])}h", *ch['v_enc'])
             f.write(data)

@@ -87,7 +87,6 @@ def load(path):
                 print(f'read {len(data)} bytes of data')
                 gdat_t0 = gdat.get_t0(sof)
                 print(f"t0: {time.asctime(gdat_t0)}")
-                print('parsing data...')
                 gdat_channels = gdat.parse(data, parameters)
                 paths['gdat'] = path
         case '.ld':
@@ -190,7 +189,7 @@ def convert(path):
         print('no gdat channels to convert')
         return
     
-    print('encoding channels... ', end='')
+    print('encoding channels... ', end='', flush=True)
     start = time.time()
     for ch in gdat_channels.values():
         gdat.encode_channel(ch)

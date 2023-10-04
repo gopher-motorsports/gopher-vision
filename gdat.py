@@ -61,10 +61,10 @@ def checksum(packet):
     return (sum).to_bytes(2)[-1] == packet[-1]
 
 def decode_packets(bytes, channels, parameters):
+    print('decoding packets... ', end='', flush=True)
     start = time.time()
     packets = bytes.split(START)
     errors = 0
-
     for p in packets:
         p = unescape(START + p)
         # verify packet size (w/o start delimiter)
@@ -76,15 +76,20 @@ def decode_packets(bytes, channels, parameters):
         ts = int.from_bytes(p[1:5])
         id = int.from_bytes(p[5:7])
         data = p[7:-1]
+        # verify id
+        if not id in parameters:
+            # print(f'invalid id: {p}')
+            errors += 1
+            continue
         # verify checksum
         if not checksum(p):
             # print(f'invalid checksum: {p}')
             errors += 1
             continue
+        # decode data
         try:
-            # decode data using parameter format
             # store all data as floats (double precision in python)
-            value = float(struct.unpack(parameters[id]['format'], data)[0])
+            value = struct.unpack(parameters[id]['format'], data)[0]
         except:
             # print(f'failed to decode packet data: '
             #       f"id: {id}, format: {parameters[id]['format']}, data: {data}")
@@ -92,9 +97,10 @@ def decode_packets(bytes, channels, parameters):
             continue
         # add to channel
         channels[id]['points'].append((ts, value))
-
     elapsed = round(time.time() - start, 2)
-    print(f'parsed {len(packets)} packets, {errors} errors ({elapsed}s)')
+    print(f'({elapsed}s)')
+
+    print(f'{len(packets)} packets, {errors} errors')
 
 # find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
 # value = encoded_value * 10^-shift * scalar / divisor
@@ -152,13 +158,9 @@ def parse(bytes, parameters):
             # data
             'sample_rate': 0,
             'points': [],
-            'data': {
-                't_raw': None, # raw timestamps
-                'v_raw': None, # raw values
-                't_int': None, # interpolated timestamps
-                'v_int': None, # interpolated values
-                'v_enc': None, # encoded values
-            }
+            't_int': None, # interpolated timestamps
+            'v_int': None, # interpolated values
+            'v_enc': None, # encoded values
         }
         for (id, param) in parameters.items()
     }
@@ -166,48 +168,56 @@ def parse(bytes, parameters):
     # add datapoints to channels
     decode_packets(bytes, channels, parameters)
 
-    print('interpolating data... ', end='')
+    print('sorting data... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
         if len(ch['points']):
             # sort points by timestamp
             ch['points'].sort(key=lambda pt: pt[0])
-            # seperate timestamp and values
-            ch['data']['t_raw'], ch['data']['v_raw'] = zip(*ch['points'])
-            # interpolate points from t=0 to t=last for evenly-spaced samples
-            ch['data']['t_int'] = np.linspace(0, ch['data']['t_raw'][-1], num=len(ch['data']['t_raw']))
-            ch['data']['v_int'] = np.interp(ch['data']['t_int'], ch['data']['t_raw'], ch['data']['v_raw'])
-            ch['sample_rate'] = round(len(ch['data']['v_int']) / (ch['data']['t_int'][-1] / 1000))
+            ch['points'] = np.array(ch['points'], dtype=np.float64)
+            # timestamps = ch['points'][:,0]
+            # values     = ch['points'][:,1]
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
-    
+
+    print('interpolating data... ', end='', flush=True)
+    start = time.time()
+    for ch in channels.values():
+        if len(ch['points']):
+            # interpolate points from t=0 to t=last for evenly-spaced samples
+            ch['t_int'] = np.linspace(0, ch['points'][:,0][-1], num=len(ch['points']))
+            ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
+            ch['sample_rate'] = round(len(ch['v_int']) / (ch['t_int'][-1] / 1000))
+    elapsed = round(time.time() - start, 2)
+    print(f'({elapsed}s)')
+
     print(f'created {len(channels)} channels')
     return channels
 
 def encode_channel(ch):
-    if ch['data']['v_enc'] is None:
-        if ch['data']['v_int'] is None:
-            ch['data']['v_enc'] = []
+    if ch['v_enc'] is None:
+        if ch['v_int'] is None:
+            ch['v_enc'] = []
         else:
-            abs_max = max(ch['data']['v_int'].max(), ch['data']['v_int'].min(), key=abs)
+            abs_max = max(ch['v_int'].max(), ch['v_int'].min(), key=abs)
             ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(abs_max)
-            ch['data']['v_enc'] = np.array(
-                [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['data']['v_int']],
+            ch['v_enc'] = np.array(
+                [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
                 dtype=np.int16
             )
 
 def plot(ch):
     plt.suptitle(f"{ch['name']} (ID: {ch['id']})")
-    plt.title(f"{len(ch['data']['v_raw'])} points")
+    plt.title(f"{len(ch['points'])} points")
     plt.xlabel('time (ms)')
     plt.ylabel(ch['unit'])
 
-    plt.plot(ch['data']['t_raw'], ch['data']['v_raw'], '.', label='raw')
-    plt.plot(ch['data']['t_int'], ch['data']['v_int'], '-', label='interpolated')
+    plt.plot(ch['points'][:,0], ch['points'][:,1], '.', label='raw')
+    plt.plot(ch['t_int'], ch['v_int'], '-', label='interpolated')
 
     encode_channel(ch)
-    decoded = [v * 10**-ch['shift'] * ch['scalar'] / ch['divisor'] for v in ch['data']['v_enc']]
-    plt.plot(ch['data']['t_int'], decoded, '--', label='decoded')
+    decoded = [v * 10**-ch['shift'] * ch['scalar'] / ch['divisor'] for v in ch['v_enc']]
+    plt.plot(ch['t_int'], decoded, '--', label='decoded')
 
     plt.ticklabel_format(useOffset=False)
     plt.legend(loc='best')
