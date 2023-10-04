@@ -407,12 +407,10 @@ def write(path, channels, t0):
         print('writing metadata...')
         f.write(header + event + venue + vehicle + weather + channel_metadata)
 
-        # write data for each channel
-        # do this at write time to avoid storing massive strings in memory
+        # pack data for each channel
+        # do this at write time to avoid storing large byte strings in memory
         print('writing data...')
         for ch in channels.values():
-            data = b''
-            for v in ch['data']['v_enc']:
-                # assumes data has been encoded for a s16
-                data += struct.pack("<h", v)
+            # assumes data has been encoded for a s16
+            data = struct.pack(f"<{len(ch['data']['v_enc'])}h", *ch['data']['v_enc'])
             f.write(data)
