@@ -2,6 +2,7 @@ import code
 import platform
 from pathlib import Path
 import time
+import sys
 
 from tabulate import tabulate
 import yaml
@@ -84,9 +85,9 @@ def load(path):
             else:
                 (sof, ext, data) = path.read_bytes().partition(b'.gdat:')
                 print(f'read {len(data)} bytes of data')
-                print('parsing data...')
                 gdat_t0 = gdat.get_t0(sof)
                 print(f"t0: {time.asctime(gdat_t0)}")
+                print('parsing data...')
                 gdat_channels = gdat.parse(data, parameters)
                 print(f'created {len(gdat_channels)} channels')
                 paths['gdat'] = path
@@ -215,4 +216,26 @@ def help():
 banner = (f'Welcome to Gopher Vision! (Python {platform.python_version()})\n'
           f'run help() to print available commands')
 shell = code.InteractiveConsole(globals())
-shell.interact(banner=banner)
+
+if __name__ == '__main__':
+    # python go4v.py
+    if len(sys.argv) == 1:
+        shell.interact(banner=banner)
+
+    # python go4v.py convert *.yaml path/to/*.gdat
+    elif sys.argv[1] == 'convert' and len(sys.argv) == 4:
+        config_name = sys.argv[2]
+        gdat_path = sys.argv[3]
+        # assumes GopherCAN is in a sibling directory
+        config_path = Path('../gophercan-lib/network_autogen/configs/') / config_name
+        # output .ld next to the gdat with the same name
+        ld_path = Path(gdat_path).with_suffix('.ld')
+        # load config and gdat
+        load(config_path)
+        load(gdat_path)
+        # convert
+        convert(ld_path)
+
+    # unknown argument pattern, default to shell
+    else:
+        shell.interact(banner=banner)

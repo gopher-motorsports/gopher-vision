@@ -7,9 +7,21 @@ cd gopher-vision
 pipenv install
 ```
 
+[Pipenv](https://pipenv.pypa.io/en/latest/) is used to manage package dependencies in a virtual environment. It must be activated before running any scripts in GopherVision. You can either:
+```
+pipenv shell
+python go4v.py ...
+pipenv exit
+```
+or
+```
+pipenv run python go4v.py ...
+```
+The rest of this README assumes the virtualenv is active when running a Python script.
+
 ## Usage
 ```
-pipenv run python go4v.py
+python go4v.py
 ```
 
 `go4v.py` opens an interactive console with several commands available:
@@ -30,6 +42,8 @@ exit()         exit the console
 ```
 
 **WARNING:** Backslashes in path arguments must be escaped. Use `load("configs\\go4-23c.yaml")` instead of `load("configs\go4-23c.yaml")`.
+
+### Example
 
 A console interface enables some useful workflows like:
 
@@ -84,3 +98,20 @@ gdat path: 9-17-IC.gdat
   <img width="500" src="img/plot.png">
   <img width="500" src="img/plot-zoomed.png">
 </p>
+
+### Shortcuts
+
+Shortcuts are provided for some common use cases to avoid using the console every time.
+
+#### `convert`
+
+```
+python go4v.py convert go4-23c.yaml data/9-17-IC.gdat
+```
+
+This shortcut assumes the GopherCAN config exists in a sibling directory:
+```
+../gophercan-lib/network_autogen/configs/go4-23c.yaml
+```
+
+The .ld file will be output next to the .gdat.
