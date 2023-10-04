@@ -291,19 +291,19 @@ def write(path, channels, t0):
         'time': time.strftime('%H:%M:%S', t0),
         'driver': 'Driver',
         'vehicle_id': 'VehicleID',
-        'engine_id': 'EngineID',
+        'engine_id': '',
         'venue': 'Venue',
         'magic4': 45126145,
         'session': 'Session',
-        'short_comment': 'ShortComment',
-        'team': 'Team'
+        'short_comment': 'Comment',
+        'team': ''
     }
 
     # order must match formats['event']
     event_values = {
         'event': 'Event',
         'session': 'Session',
-        'long_comment': 'LongComment',
+        'long_comment': '',
         'venue_ptr': venue_offset,
         'weather_ptr': weather_offset
     }
@@ -311,52 +311,52 @@ def write(path, channels, t0):
     # order must match formats['venue']
     venue_values = {
         'venue': 'Venue',
-        'venue_length': 420000,
+        'venue_length': 0,
         'vehicle_ptr': vehicle_offset,
-        'venue_category': 'Category'
+        'venue_category': ''
     }
 
     # order must match formats['vehicle']
     vehicle_values = {
         'vehicle_id': 'VehicleID',
-        'vehicle_desc': 'VehicleDescription',
-        'engine_id': 'EngineID',
-        'vehicle_weight': 100,
-        'fuel_tank': 2000,
-        'vehicle_type': 'VehicleType',
-        'driver_type': 'DriveType',
-        'diff_ratio': 41248,
-        'gear1': 1000,
-        'gear2': 2000,
-        'gear3': 3000,
-        'gear4': 4000,
-        'gear5': 5000,
-        'gear6': 6000,
-        'gear7': 7000,
-        'gear8': 8000,
-        'gear9': 9000,
-        'gear10': 10000,
-        'vehicle_track': 300,
-        'vehicle_wheelbase': 400,
-        'vehicle_comment': 'VehicleComment',
-        'vehicle_number': 'VehicleNumber'
+        'vehicle_desc': '',
+        'engine_id': '',
+        'vehicle_weight': 0,
+        'fuel_tank': 0,
+        'vehicle_type': '',
+        'driver_type': '',
+        'diff_ratio': 0,
+        'gear1': 0,
+        'gear2': 0,
+        'gear3': 0,
+        'gear4': 0,
+        'gear5': 0,
+        'gear6': 0,
+        'gear7': 0,
+        'gear8': 0,
+        'gear9': 0,
+        'gear10': 0,
+        'vehicle_track': 0,
+        'vehicle_wheelbase': 0,
+        'vehicle_comment': '',
+        'vehicle_number': ''
     }
 
     # order must match formats['weather']
     weather_values = {
-        'sky': 'Sunny',
-        'air_temp': '200',
-        'air_temp_unit': 'C',
-        'track_temp': '100',
-        'track_temp_unit': 'C',
-        'pressure': '3',
-        'pressure_unit': 'bar',
-        'humidity': '40',
-        'humidity_unit': '%',
-        'wind_speed': '50',
-        'wind_speed_unit': 'km/h',
-        'wind_direction': 'WindDirection',
-        'weather_comment': 'WeatherComment'
+        'sky': '',
+        'air_temp': '',
+        'air_temp_unit': '',
+        'track_temp': '',
+        'track_temp_unit': '',
+        'pressure': '',
+        'pressure_unit': '',
+        'humidity': '',
+        'humidity_unit': '',
+        'wind_speed': '',
+        'wind_speed_unit': '',
+        'wind_direction': '',
+        'weather_comment': ''
     }
 
     def enc_str(values):
