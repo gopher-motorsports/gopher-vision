@@ -403,14 +403,16 @@ def write(path, channels, t0):
 
         channel_metadata += struct.pack(formats['ch_meta'], *enc_str(ch_meta.values()))
 
+    print(f'writing to "{path}"... ', end='', flush=True)
+    start = time.time()
     with open(path, 'wb') as f:
-        print('writing metadata...')
         f.write(header + event + venue + vehicle + weather + channel_metadata)
 
         # pack data for each channel
         # do this at write time to avoid storing large byte strings in memory
-        print('writing data...')
         for ch in channels.values():
             # assumes data has been encoded for a s16
             data = struct.pack(f"<{len(ch['v_enc'])}h", *ch['v_enc'])
             f.write(data)
+    elapsed = round(time.time() - start, 2)
+    print(f'({elapsed}s)')

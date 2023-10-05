@@ -196,7 +196,6 @@ def convert(path):
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
     
-    print(f"converting {paths['gdat'].name} to .ld ...")
     ld.write(path, gdat_channels, gdat_t0)
 
 def help():

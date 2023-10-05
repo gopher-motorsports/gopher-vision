@@ -14,8 +14,8 @@ import numpy as np
 from fractions import Fraction
 import matplotlib.pyplot as plt
 
-START = bytes.fromhex('7e')
-ESC = bytes.fromhex('7d')
+START = 0x7E
+ESC = 0x7D
 MIN_PACKET_LENGTH = 9
 
 random.seed()
@@ -27,80 +27,61 @@ def get_t0(sof):
     except:
         return time.gmtime(0)
 
-def escape(packet):
-    p = bytearray(START)
-    for b in packet[1:]:
-        if b == int.from_bytes(ESC) or b == int.from_bytes(START):
-            # add 7D control byte with escaped byte
-            p.append(ESC)
-            p.append(b ^ 0x20)
-        else:
-            # add raw byte
-            p.append(b)
-    return p
-
-def unescape(packet):
-    p = bytearray()
-    i = 0
-    while i < len(packet):
-        if packet[i] == int.from_bytes(ESC):
-            # skip 7D control byte, unescape next byte
-            i += 1
-            if i >= len(packet): break
-            p.append(packet[i] ^ 0x20)
-        else:
-            # add raw byte
-            p.append(packet[i])
-        i += 1
-    return p
-
-def checksum(packet):
-    sum = 0
-    for byte in packet[:-1]:
-        sum += byte
-    return (sum).to_bytes(2)[-1] == packet[-1]
-
 def decode_packets(bytes, channels, parameters):
     print('decoding packets... ', end='', flush=True)
     start = time.time()
-    packets = bytes.split(START)
+    packets = 0
     errors = 0
-    for p in packets:
-        p = unescape(START + p)
-        # verify packet size (w/o start delimiter)
-        if len(p) < MIN_PACKET_LENGTH - 1:
-            # print(f'packet too small: {p}')
+
+    packet = bytearray()
+    def decode():
+        nonlocal packets
+        nonlocal errors
+        packets += 1
+        # verify packet size
+        if len(packet) < MIN_PACKET_LENGTH:
             errors += 1
-            continue
-        # split packet into components
-        ts = int.from_bytes(p[1:5])
-        id = int.from_bytes(p[5:7])
-        data = p[7:-1]
+            return
+        # split into components
+        ts = int.from_bytes(packet[1:5])
+        id = int.from_bytes(packet[5:7])
+        data = packet[7:-1]
         # verify id
         if not id in parameters:
-            # print(f'invalid id: {p}')
             errors += 1
-            continue
+            return
         # verify checksum
-        if not checksum(p):
-            # print(f'invalid checksum: {p}')
+        sum = 0
+        for b in packet[:-1]: sum += b
+        if not sum.to_bytes(2)[-1] == packet[-1]:
             errors += 1
-            continue
-        # decode data
+            return
+        # unpack data
         try:
-            # store all data as floats (double precision in python)
             value = struct.unpack(parameters[id]['format'], data)[0]
         except:
-            # print(f'failed to decode packet data: '
-            #       f"id: {id}, format: {parameters[id]['format']}, data: {data}")
             errors += 1
-            continue
+            return
         # add to channel
         channels[id]['points'].append((ts, value))
+
+    esc = False
+    for b in bytes:
+        if b == START:
+            decode()
+            packet = bytearray()
+            packet.append(START)
+        elif b == ESC:
+            esc = True
+        elif esc:
+            packet.append(b ^ 0x20)
+            esc = False
+        else:
+            packet.append(b)
+        
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
-
-    print(f'{len(packets)} packets, {errors} errors')
+    print(f'{packets} packets, {errors} errors')
 
 # find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
 # value = encoded_value * 10^-shift * scalar / divisor
@@ -222,27 +203,3 @@ def plot(ch):
     plt.ticklabel_format(useOffset=False)
     plt.legend(loc='best')
     plt.show()
-
-def generate_packet(param):
-    ts = int(time.time() * 1000 - start_ms)
-    data = random.uniform(-100, 100) if param['type'] == 'FLOATING'\
-        else int.from_bytes(random.randbytes(param['size']), signed=param['signed'])
-    
-    packet = START
-    packet += struct.pack('>I', ts)
-    packet += struct.pack('>H', param['id'])
-    packet += struct.pack(param['format'], data)
-
-    checksum = 0
-    for b in packet: checksum += b
-    packet += (checksum).to_bytes(2)[-1:]
-
-    return packet
-
-def generate_data(parameters, nbytes):
-    b = b''
-    while len(b) < nbytes:
-        param = random.choice(list(parameters.values()))
-        packet = generate_packet(param)
-        b += escape(packet)
-    return b
