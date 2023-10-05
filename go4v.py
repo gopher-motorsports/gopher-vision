@@ -119,7 +119,7 @@ def info_gdat():
         ch_info = []
         for channel in gdat_channels.values():
             # exclude a few keys from the table
-            ch = {k:v for k,v in channel.items() if k not in ['points', 'data']}
+            ch = {k:v for k,v in channel.items() if k not in ['points', 't_int', 'v_int', 'v_enc']}
             ch['points'] = len(channel['points'])
             ch_info.append(ch)
         print(tabulate(ch_info, headers='keys'))
@@ -248,6 +248,19 @@ if __name__ == '__main__':
 
         elapsed = round(time.time() - start, 2)
         print(f'\nfinished in {elapsed}s')
+
+    # python go4v.py preload *.yaml path/to/*.gdat
+    elif sys.argv[1] == 'preload' and len(sys.argv) == 4:
+        start = time.time()
+        # assumes GopherCAN is in a sibling directory
+        config_name = sys.argv[2]
+        config_path = Path('../gophercan-lib/network_autogen/configs/') / config_name
+        load(config_path)
+        load(sys.argv[3])
+        elapsed = round(time.time() - start, 2)
+        print(f'\nfinished in {elapsed}s\n')
+
+        shell.interact(banner=banner)
 
     # unknown argument pattern, default to shell
     else:

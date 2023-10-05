@@ -109,7 +109,7 @@ Shortcuts are provided for some common use cases to avoid using the console ever
 python go4v.py convert go4-23c.yaml data/9-17-IC.gdat
 ```
 
-This shortcut assumes the GopherCAN config exists in a sibling directory:
+Assumes the GopherCAN config exists in a sibling directory:
 ```
 ../gophercan-lib/network_autogen/configs/go4-23c.yaml
 ```
@@ -120,3 +120,16 @@ You can also convert an entire folder of .gdat files:
 ```
 python go4v.py convert go4-23c.yaml data/
 ```
+
+#### `preload`
+
+```
+python go4v.py preload go4-23c.yaml data/9-17-IC.gdat
+```
+
+Assumes the GopherCAN config exists in a sibling directory:
+```
+../gophercan-lib/network_autogen/configs/go4-23c.yaml
+```
+
+After loading the GopherCAN config and .gdat file, the interactive console opens. From here, you can plot channels, convert to .ld, etc.
