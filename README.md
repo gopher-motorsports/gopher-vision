@@ -1,13 +1,15 @@
-**GopherVision** is a collection of Python (3.11) utilities for interacting with Gopher Motorsports data.
+**GopherVision** is a collection of Python utilities for interacting with Gopher Motorsports data.
 
 ## Installation
+First, install [Python 3.11](https://www.python.org/downloads/release/python-3116/) (or newer) and [Pipenv](https://pipenv.pypa.io/en/latest/installation/). Then:
+
 ```
 git clone https://github.com/gopher-motorsports/gopher-vision.git
 cd gopher-vision
 pipenv install
 ```
 
-[Pipenv](https://pipenv.pypa.io/en/latest/) is used to manage package dependencies in a virtual environment. It must be activated before running any scripts in GopherVision. You can either:
+Pipenv is used to manage package dependencies in a virtual environment. It must be activated before running any scripts in GopherVision. You can either:
 ```
 pipenv shell
 python go4v.py ...

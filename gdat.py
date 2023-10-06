@@ -38,28 +38,19 @@ def decode_packets(bytes, channels, parameters):
         nonlocal packets
         nonlocal errors
         packets += 1
-        # verify packet size
-        if len(packet) < MIN_PACKET_LENGTH:
-            errors += 1
-            return
         # split into components
-        ts = int.from_bytes(packet[1:5])
-        id = int.from_bytes(packet[5:7])
-        data = packet[7:-1]
-        # verify id
-        if not id in parameters:
+        # verifies packet length (unpack would fail)
+        # verifies id (parameters access would fail)
+        try:
+            ts, id = struct.unpack('>IH', packet[1:7])
+            value = struct.unpack(parameters[id]['format'], packet[7:-1])[0]
+        except:
             errors += 1
             return
         # verify checksum
         sum = 0
         for b in packet[:-1]: sum += b
         if not sum.to_bytes(2)[-1] == packet[-1]:
-            errors += 1
-            return
-        # unpack data
-        try:
-            value = struct.unpack(parameters[id]['format'], data)[0]
-        except:
             errors += 1
             return
         # add to channel
