@@ -19,11 +19,10 @@ or
 ```
 pipenv run python go4v.py ...
 ```
-The rest of this README assumes the virtualenv is active when running a Python script.
 
 ## Usage
 ```
-python go4v.py
+pipenv run python go4v.py
 ```
 
 `go4v.py` opens an interactive console with several commands available:
@@ -52,7 +51,7 @@ Shortcuts are provided for some common use cases to avoid using the console ever
 #### `convert`
 
 ```
-python go4v.py convert go4-23c.yaml data/9-17-IC.gdat
+pipenv run python go4v.py convert go4-23c.yaml data/9-17-IC.gdat
 ```
 
 Assumes the GopherCAN config exists in a sibling directory:
@@ -64,13 +63,13 @@ The .ld file will be output next to the .gdat.
 
 You can also convert an entire folder of .gdat files:
 ```
-python go4v.py convert go4-23c.yaml data/
+pipenv run python go4v.py convert go4-23c.yaml data/
 ```
 
 #### `preload`
 
 ```
-python go4v.py preload go4-23c.yaml data/9-17-IC.gdat
+pipenv run python go4v.py preload go4-23c.yaml data/9-17-IC.gdat
 ```
 
 After loading the GopherCAN config and .gdat file, the interactive console opens. From here, you can plot channels, convert to .ld, etc.
