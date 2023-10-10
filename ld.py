@@ -401,7 +401,10 @@ def write(path, channels, t0):
         if i == len(channels) - 1: ch_meta['next_ptr'] = 0
         else: ch_meta['next_ptr'] = meta_offset + ch_meta_size * (i + 1)
 
-        channel_metadata += struct.pack(formats['ch_meta'], *enc_str(ch_meta.values()))
+        try:
+            channel_metadata += struct.pack(formats['ch_meta'], *enc_str(ch_meta.values()))
+        except:
+            print(f"failed to pack channel metadata: {ch_meta} (channel {ch['id']})")
 
     print(f'writing to "{path}"... ', end='', flush=True)
     start = time.time()

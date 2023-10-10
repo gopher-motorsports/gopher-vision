@@ -1,7 +1,7 @@
 **GopherVision** is a collection of Python utilities for interacting with Gopher Motorsports data.
 
 ## Installation
-First, install [Python 3.11](https://www.python.org/downloads/release/python-3116/) (or newer) and [Pipenv](https://pipenv.pypa.io/en/latest/installation/). Then:
+First, install [Python 3.12](https://www.python.org/downloads/release/python-3120/) and [Pipenv](https://pipenv.pypa.io/en/latest/installation/). Then:
 
 ```
 git clone https://github.com/gopher-motorsports/gopher-vision.git
@@ -43,7 +43,37 @@ exit()         exit the console
 -------------  -----------------------------------------------------------------------------
 ```
 
-**WARNING:** Backslashes in path arguments must be escaped. Use `load("configs\\go4-23c.yaml")` instead of `load("configs\go4-23c.yaml")`.
+**WARNING:** When using the console, backslashes in path arguments must be escaped. Use `load("configs\\go4-23c.yaml")` instead of `load("configs\go4-23c.yaml")`.
+
+### Shortcuts
+
+Shortcuts are provided for some common use cases to avoid using the console every time.
+
+#### `convert`
+
+```
+python go4v.py convert go4-23c.yaml data/9-17-IC.gdat
+```
+
+Assumes the GopherCAN config exists in a sibling directory:
+```
+../gophercan-lib/network_autogen/configs/go4-23c.yaml
+```
+
+The .ld file will be output next to the .gdat.
+
+You can also convert an entire folder of .gdat files:
+```
+python go4v.py convert go4-23c.yaml data/
+```
+
+#### `preload`
+
+```
+python go4v.py preload go4-23c.yaml data/9-17-IC.gdat
+```
+
+After loading the GopherCAN config and .gdat file, the interactive console opens. From here, you can plot channels, convert to .ld, etc.
 
 ### Example
 
@@ -100,38 +130,3 @@ gdat path: 9-17-IC.gdat
   <img width="500" src="img/plot.png">
   <img width="500" src="img/plot-zoomed.png">
 </p>
-
-### Shortcuts
-
-Shortcuts are provided for some common use cases to avoid using the console every time.
-
-#### `convert`
-
-```
-python go4v.py convert go4-23c.yaml data/9-17-IC.gdat
-```
-
-Assumes the GopherCAN config exists in a sibling directory:
-```
-../gophercan-lib/network_autogen/configs/go4-23c.yaml
-```
-
-The .ld file will be output next to the .gdat.
-
-You can also convert an entire folder of .gdat files:
-```
-python go4v.py convert go4-23c.yaml data/
-```
-
-#### `preload`
-
-```
-python go4v.py preload go4-23c.yaml data/9-17-IC.gdat
-```
-
-Assumes the GopherCAN config exists in a sibling directory:
-```
-../gophercan-lib/network_autogen/configs/go4-23c.yaml
-```
-
-After loading the GopherCAN config and .gdat file, the interactive console opens. From here, you can plot channels, convert to .ld, etc.

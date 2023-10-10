@@ -124,8 +124,8 @@ def parse(bytes, parameters):
             'unit': param['unit'],
             # scalars to encode in s16
             'shift': 0,
-            'scalar': 0,
-            'divisor': 0,
+            'scalar': 1,
+            'divisor': 1,
             'offset': 0,
             # data
             'sample_rate': 0,
@@ -155,7 +155,7 @@ def parse(bytes, parameters):
     print('interpolating data... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
-        if len(ch['points']):
+        if len(ch['points']) > 1:
             # interpolate points from t=0 to t=last for evenly-spaced samples
             ch['t_int'] = np.linspace(0, ch['points'][:,0][-1], num=len(ch['points']))
             ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
@@ -163,20 +163,28 @@ def parse(bytes, parameters):
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
 
-    print(f'created {len(channels)} channels')
-    return channels
-
-def encode_channel(ch):
-    if ch['v_enc'] is None:
+    print('encoding channels... ', end='', flush=True)
+    start = time.time()
+    for ch in channels.values():
         if ch['v_int'] is None:
             ch['v_enc'] = []
         else:
             abs_max = max(ch['v_int'].max(), ch['v_int'].min(), key=abs)
-            ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(abs_max)
-            ch['v_enc'] = np.array(
-                [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
-                dtype=np.int16
-            )
+            try:
+                ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(abs_max)
+            except:
+                print(f"failed to encode channel \"{ch['name']}\" ({ch['id']}) abs_max: {abs_max}")
+                ch['v_enc'] = []
+            else:
+                ch['v_enc'] = np.array(
+                    [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
+                    dtype=np.int16
+                )
+    elapsed = round(time.time() - start, 2)
+    print(f'({elapsed}s)')
+
+    print(f'created {len(channels)} channels')
+    return channels
 
 def plot(ch):
     plt.suptitle(f"{ch['name']} (ID: {ch['id']})")
@@ -187,7 +195,6 @@ def plot(ch):
     plt.plot(ch['points'][:,0], ch['points'][:,1], '.', label='raw')
     plt.plot(ch['t_int'], ch['v_int'], '-', label='interpolated')
 
-    encode_channel(ch)
     decoded = [v * 10**-ch['shift'] * ch['scalar'] / ch['divisor'] for v in ch['v_enc']]
     plt.plot(ch['t_int'], decoded, '--', label='decoded')
 

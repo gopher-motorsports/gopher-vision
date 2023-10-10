@@ -54,8 +54,8 @@ def load_config(path):
 
             parameters[p['id']] = {
                 'id': p['id'],
-                'name': p.get('motec_name'),
-                'unit': p.get('unit'),
+                'name': p.get('motec_name') or '',
+                'unit': p.get('unit') or '',
                 **types[type]
             }
 
@@ -188,13 +188,6 @@ def convert(path):
     if not len(gdat_channels):
         print('no gdat channels to convert')
         return
-    
-    print('encoding channels... ', end='', flush=True)
-    start = time.time()
-    for ch in gdat_channels.values():
-        gdat.encode_channel(ch)
-    elapsed = round(time.time() - start, 2)
-    print(f'({elapsed}s)')
     
     ld.write(path, gdat_channels, gdat_t0)
 
