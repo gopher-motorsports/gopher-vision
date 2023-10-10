@@ -176,18 +176,18 @@ def plot_ld(name):
 
 def convert(path):
     path = Path(path)
-    if path.is_file():
-        print(f'"{path}" already exists')
-        return
-    if not path.suffix == '.ld':
-        print(f'path must lead to a .ld file')
-        return
     if not paths['gdat']:
         print('no .gdat loaded')
         return
     if not len(gdat_channels):
         print('no gdat channels to convert')
         return
+    if not path.suffix == '.ld':
+        print(f'path must lead to a .ld file')
+        return
+    if path.is_file():
+        print(f'deleting "{path}"...')
+        path.unlink()
     
     ld.write(path, gdat_channels, gdat_t0)
 
