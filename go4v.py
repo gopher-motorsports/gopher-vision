@@ -225,6 +225,10 @@ if __name__ == '__main__':
         load(config_path)
 
         def convert_single(gdat_path):
+            if not gdat_path.suffix == '.gdat':
+                print(f'{gdat_path} is not a .gdat file')
+                return
+            
             load(gdat_path)
             # output .ld next to the gdat with the same name
             ld_path = Path(gdat_path).with_suffix('.ld')
