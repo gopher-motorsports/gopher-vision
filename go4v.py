@@ -120,7 +120,6 @@ def info_gdat():
         for channel in gdat_channels.values():
             # exclude a few keys from the table
             ch = {k:v for k,v in channel.items() if k not in ['points', 't_int', 'v_int', 'v_enc']}
-            ch['points'] = len(channel['points'])
             ch_info.append(ch)
         print(tabulate(ch_info, headers='keys'))
     else:
@@ -141,19 +140,10 @@ def info_ld():
         print(tabulate(ld_metadata['weather'].items()))
         print('CHANNELS')
         ch_info = []
-        for ch in ld_channels.values():
-            ch_info.append({
-                'meta_ptr': hex(ch['meta_ptr']),
-                'data_ptr': hex(ch['data_ptr']),
-                'size': ch['size'],
-                'name': ch['name'],
-                'sample_rate': ch['sample_rate'],
-                'sample_count': ch['sample_count'],
-                'shift': ch['shift'],
-                'scalar': ch['scalar'],
-                'divisor': ch['divisor'],
-                'offset': ch['offset'],
-            })
+        for channel in ld_channels.values():
+            # exclude a few keys from the table
+            ch = {k:v for k,v in channel.items() if k not in ['data']}
+            ch_info.append(ch)
         print(tabulate(ch_info, headers='keys'))
     else:
         print('no .ld loaded')

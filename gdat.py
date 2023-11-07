@@ -11,6 +11,7 @@ import time
 import struct
 import random
 import numpy as np
+import math
 from fractions import Fraction
 import matplotlib.pyplot as plt
 
@@ -28,8 +29,6 @@ def get_t0(sof):
         return time.gmtime(0)
 
 def decode_packets(bytes, channels, parameters):
-    print('decoding packets... ', end='', flush=True)
-    start = time.time()
     packets = 0
     errors = 0
 
@@ -70,9 +69,7 @@ def decode_packets(bytes, channels, parameters):
         else:
             packet.append(b)
         
-    elapsed = round(time.time() - start, 2)
-    print(f'({elapsed}s)')
-    print(f'{packets} packets, {errors} errors')
+    return (packets, errors)
 
 # find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
 # value = encoded_value * 10^-shift * scalar / divisor
@@ -122,13 +119,19 @@ def parse(bytes, parameters):
             'id': id,
             'name': param['name'],
             'unit': param['unit'],
+            'sample_count': 0,
+            'delta_ms': 0,
+            'frequency_hz': 0,
+            't_min': 0,
+            't_max': 0,
+            'v_min': 0,
+            'v_max': 0,
             # scalars to encode in s16
             'shift': 0,
             'scalar': 1,
             'divisor': 1,
             'offset': 0,
             # data
-            'sample_rate': 0,
             'points': [],
             't_int': None, # interpolated timestamps
             'v_int': None, # interpolated values
@@ -137,36 +140,86 @@ def parse(bytes, parameters):
         for (id, param) in parameters.items()
     }
 
-    # add datapoints to channels
-    decode_packets(bytes, channels, parameters)
+    print('decoding packets... ', end='', flush=True)
+    start = time.time()
+    (packets, errors) = decode_packets(bytes, channels, parameters)
+    for id in list(channels.keys()):
+        # remove channels with no data
+        if len(channels[id]['points']) == 0:
+            del channels[id]
+    elapsed = round(time.time() - start, 2)
+    print(f'({elapsed}s)')
+    print(f'{packets} packets, {errors} errors')
 
     print('sorting data... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
-        if len(ch['points']):
-            # sort points by timestamp
-            ch['points'].sort(key=lambda pt: pt[0])
-            ch['points'] = np.array(ch['points'], dtype=np.float64)
-            # timestamps = ch['points'][:,0]
-            # values     = ch['points'][:,1]
+        # sort points by timestamp
+        ch['points'].sort(key=lambda pt: pt[0])
+        ch['points'] = np.array(ch['points'], dtype=np.float64)
+        # timestamps = ch['points'][:,0]
+        # values     = ch['points'][:,1]
+
+        ch['t_min'] = ch['points'][:,0].min()
+        ch['t_max'] = ch['points'][:,0].max()
+        ch['v_min'] = ch['points'][:,1].min()
+        ch['v_max'] = ch['points'][:,1].max()
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
 
     print('interpolating data... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
+        # calculate time axis delta / channel frequency
+        delta = 100 # assume 100ms if a channel has a single point
         if len(ch['points']) > 1:
-            # interpolate points from t=0 to t=last for evenly-spaced samples
-            ch['t_int'] = np.linspace(0, ch['points'][:,0][-1], num=len(ch['points']))
-            ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
-            ch['sample_rate'] = round(len(ch['v_int']) / (ch['t_int'][-1] / 1000))
+            # find the most common time delta between points
+            deltas = np.diff(ch['points'][:,0])
+            unique_deltas, counts = np.unique(deltas, return_counts=True)
+            delta = int(unique_deltas[counts == counts.max()][0])
+            # round so that delta & frequency are integers
+            while 1000 % delta != 0: delta += 1
+        # use this delta to get channel frequency (between 1Hz and 1000Hz)
+        ch['delta_ms'] = delta
+        ch['frequency_hz'] = math.trunc(max(1, min(1000, 1000 / ch['delta_ms'])))
+        ch['sample_count'] = math.trunc(ch['t_max'] / ch['delta_ms'])
+
+        # interpolate points from t=0 to t=last
+        # ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
+
+        # print()
+        # create a new time axis with this frequency and sample count
+        t_int = list(range(ch['sample_count'])) * ch['delta_ms']
+        # get closest point to each time tick
+        v_int = [0] * ch['sample_count']
+        i = 0
+        j = 0
+        ts = 0
+        while j < ch['sample_count']:
+            if ch['points'][i][0] == ch['points'][0][0]:
+                if ts > ch['points'][i][0]:
+                    i += 1
+                else:
+                    v_int[j] = ch['points'][i][1]
+                    # print(ts, ch['points'][i][0], ch['points'][i][1])
+                    j += 1
+                    ts += ch['delta_ms']
+            else:
+                while ts > ch['points'][i+1][0]: i += 1
+                v_int[j] = ch['points'][i][1]
+                # print(ts, ch['points'][i][0], ch['points'][i][1])
+                j += 1
+                ts += ch['delta_ms']
+
+        ch['t_int'] = np.array(t_int, dtype=np.float64)
+        ch['v_int'] = np.array(v_int, dtype=np.float64)
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
 
     print('encoding channels... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
-        if ch['v_int'] is None:
+        if ch['v_int'] is None or len(ch['v_int']) == 0:
             ch['v_enc'] = []
         else:
             abs_max = max(ch['v_int'].max(), ch['v_int'].min(), key=abs)
