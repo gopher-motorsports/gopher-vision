@@ -174,7 +174,7 @@ layouts['ch_meta'] = (
     ('name',             '32s'),    # 20        20
     ('short_name',       '8s'),     # 40        8
     ('unit',             '12s'),    # 48        C
-    ('',                 '40x'),    # 54        28
+    ('',                 '40x'),    # 54        28        sometimes contains nonzero values
 )
 
 (k, f) = zip(*layouts['ch_meta'])
@@ -300,7 +300,7 @@ def write(path, channels, t0):
         'meta_ptr': meta_offset,
         'data_ptr': data_offset,
         'event_ptr': event_offset,
-        'magic1': 0x0002,
+        'magic1': 0,
         'magic2': 0x4240,
         'magic3': 0x000F,
         'device_serial': 21115,
@@ -309,7 +309,7 @@ def write(path, channels, t0):
         'magic4': 0x0080,
         'num_channels': len(channels),
         'num_channels2': len(channels),
-        'magic5': 0x000A01F4,
+        'magic5': 327700,
         'date': time.strftime('%d/%m/%Y', t0),
         'time': time.strftime('%H:%M:%S', t0),
         'driver': 'Driver',
@@ -413,8 +413,8 @@ def write(path, channels, t0):
             'divisor': ch['divisor'],
             'shift': ch['shift'],
             'name': ch['name'],
-            'short_name': ch['unit'],
-            'unit': '',
+            'short_name': '',
+            'unit': ch['unit'],
         }
 
         if i == 0: ch_meta['prev_ptr'] = 0 # first channel has no prev_ptr

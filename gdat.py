@@ -68,6 +68,7 @@ def decode_packets(bytes, channels, parameters):
             esc = False
         else:
             packet.append(b)
+    decode()
         
     return (packets, errors)
 
@@ -75,43 +76,45 @@ def decode_packets(bytes, channels, parameters):
 # value = encoded_value * 10^-shift * scalar / divisor
 # encoded_value = value / 10^-shift / scalar * divisor
 # to make the most of a s16: abs_max = (2^15 - 1) * 10^-shift * scalar / divisor
-def get_scalars(abs_max):
-    if abs_max == 0:
-        shift = 0
-        scalar = 1
-        divisor = 1
-        return (shift, scalar, divisor)
+def get_scalars(id, v_min, v_max):
+    abs_max = max(abs(v_min), abs(v_max))
 
-    # start with high shift to preserve precision
-    for shift in range(10, -10, -1):
-        # calculate required scale to use this shift
-        scale = abs_max / (2**15-1) / 10**-shift
-        # convert scale to integer fraction
-        scalar, divisor = Fraction(scale).limit_denominator(2**15-1).as_integer_ratio()
-        if scalar == 0:
-            # scale can't be represented
-            continue
-        elif -2**15 <= scalar <= 2**15-1:
-            # both scalar & divisor will fit in s16
-            break
+    exp = 0
+    scale = abs_max
+    scf = 0
+    shift = 0
+    offset = 0
+    done = False
+
+    if v_max - v_min <= 0.001:
+        if -0.0001 <= abs_max <= 0.0001:
+            exp = 0
+            scale = 1
         else:
-            # adjust scalar to fit in s16 (adjust divisor to maintain fraction)
-            adj = (2**15-1) / scalar
-            scalar = round(scalar * adj)
-            divisor = round(divisor * adj)
-            # check if divisor is still valid
-            if -2**15 <= divisor <= 2**15-1 and divisor != 0:
-                # max encoded value
-                enc_max = abs_max / 10**-shift / scalar * divisor
-                # % error with this new fraction to the ideal scale
-                error = ((scalar / divisor) - scale) / scale
-                # 10% error is acceptable
-                if enc_max <= 2**15-1 and error <= 0.1:
-                    break
-    else:
-        raise Exception(f'failed to find scalars for ({abs_max})')
+            exp = 1
+            scale = abs_max
+        scf = 8 * (10**exp) / scale
+        shift = 6 - exp
+        done = True
 
-    return (shift, scalar, divisor)
+    exp = -37
+    while exp < 37 and not done:
+        if scale >= 8 * 10**exp and scale < 8 * 10**(exp+1):
+            scf = 8 * 10**exp / scale
+            shift = 6 - exp
+            done = True
+        exp += 1
+
+    if not done:
+        print(f'failed to find scalars for ch={id} min={v_min} max={v_max}')
+    
+    scalar, divisor = Fraction(scf).limit_denominator(2047).as_integer_ratio()
+    if scalar > 2047:
+        scalar = 0
+        divisor = 0
+        shift = 0
+    
+    return (shift, scalar, divisor, scf)
 
 def parse(bytes, parameters):
     channels = {
@@ -133,6 +136,7 @@ def parse(bytes, parameters):
             'offset': 0,
             # data
             'points': [],
+            'num_points': 0,
             't_int': None, # interpolated timestamps
             'v_int': None, # interpolated values
             'v_enc': None, # encoded values
@@ -142,7 +146,7 @@ def parse(bytes, parameters):
 
     print('decoding packets... ', end='', flush=True)
     start = time.time()
-    (packets, errors) = decode_packets(bytes, channels, parameters)
+    packets, errors = decode_packets(bytes, channels, parameters)
     for id in list(channels.keys()):
         # remove channels with no data
         if len(channels[id]['points']) == 0:
@@ -155,6 +159,7 @@ def parse(bytes, parameters):
     start = time.time()
     for ch in channels.values():
         # sort points by timestamp
+        ch['num_points'] = len(ch['points'])
         ch['points'].sort(key=lambda pt: pt[0])
         ch['points'] = np.array(ch['points'], dtype=np.float64)
         # timestamps = ch['points'][:,0]
@@ -176,16 +181,13 @@ def parse(bytes, parameters):
             # find the most common time delta between points
             deltas = np.diff(ch['points'][:,0])
             unique_deltas, counts = np.unique(deltas, return_counts=True)
-            delta = int(unique_deltas[counts == counts.max()][0])
+            delta = min(int(unique_deltas[counts == counts.max()][0]), 100)
             # round so that delta & frequency are integers
             while 1000 % delta != 0: delta += 1
         # use this delta to get channel frequency (between 1Hz and 1000Hz)
         ch['delta_ms'] = delta
         ch['frequency_hz'] = math.trunc(max(1, min(1000, 1000 / ch['delta_ms'])))
         ch['sample_count'] = math.trunc(ch['t_max'] / ch['delta_ms'])
-
-        # interpolate points from t=0 to t=last
-        # ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
 
         # print()
         # create a new time axis with this frequency and sample count
@@ -201,13 +203,11 @@ def parse(bytes, parameters):
                     i += 1
                 else:
                     v_int[j] = ch['points'][i][1]
-                    # print(ts, ch['points'][i][0], ch['points'][i][1])
                     j += 1
                     ts += ch['delta_ms']
             else:
                 while ts > ch['points'][i+1][0]: i += 1
                 v_int[j] = ch['points'][i][1]
-                # print(ts, ch['points'][i][0], ch['points'][i][1])
                 j += 1
                 ts += ch['delta_ms']
 
@@ -219,22 +219,20 @@ def parse(bytes, parameters):
     print('encoding channels... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
-        if ch['v_int'] is None or len(ch['v_int']) == 0:
-            ch['v_enc'] = []
-        else:
-            abs_max = max(ch['v_int'].max(), ch['v_int'].min(), key=abs)
-            try:
-                ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(abs_max)
-            except:
-                print(f"failed to encode channel \"{ch['name']}\" ({ch['id']}) abs_max: {abs_max}")
-                ch['v_enc'] = []
-            else:
-                ch['v_enc'] = np.array(
-                    [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
-                    dtype=np.int16
-                )
+        ch['v_enc'] = []
+        ch['shift'], ch['scalar'], ch['divisor'], ch['scf'] = get_scalars(ch['id'], ch['v_min'], ch['v_max'])
+        if ch['divisor'] > 0:
+            ch['v_enc'] = np.array(
+                [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
+                dtype=np.int32
+            )
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
+
+    for id in list(channels.keys()):
+        # remove channels with failed encodings
+        if len(channels[id]['v_enc']) == 0:
+            del channels[id]
 
     print(f'created {len(channels)} channels')
     return channels
