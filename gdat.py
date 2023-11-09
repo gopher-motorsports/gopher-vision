@@ -1,12 +1,3 @@
-# .gdat files begin with "/PLM_YYYY-MM-DD-HH-MM-SS.gdat:" (RTC time of file creation)
-# followed by a series of packets of the following format (big endian):
-# 0    1 2 3 4     5 6   7 n    n+1
-# 7E   TIMESTAMP   ID    DATA   CHECKSUM
-
-# 0x7E indicates the start of a packet
-# 0x7D indicates that the next byte has been escaped (XORed with 0x20)
-# CHECKSUM = sum of bytes ignoring overflow (including start delimiter), calculated on unescaped packet
-
 import time
 import struct
 import random
@@ -14,6 +5,15 @@ import numpy as np
 import math
 from fractions import Fraction
 import matplotlib.pyplot as plt
+
+# .gdat files begin with "/PLM_YYYY-MM-DD-HH-MM-SS.gdat:" (RTC time of file creation)
+# followed by a series of packets of the following format (big endian):
+# 0    1 2 3 4     5 6   7 n    n+1
+# 7E   TIMESTAMP   ID    DATA   CHECKSUM
+
+# 0x7E indicates the start of a packet
+# 0x7D indicates that the next byte has been escaped (XORed with 0x20)
+# CHECKSUM = sum of bytes ignoring overflow, calculated on unescaped packet, including start delimiter
 
 START = 0x7E
 ESC = 0x7D
@@ -26,17 +26,19 @@ def get_t0(sof):
     try:
         return time.strptime(sof.decode(), '/PLM_%Y-%m-%d-%H-%M-%S')
     except:
+        print(f'failed to parse timestamp "{sof.decode()}"')
         return time.gmtime(0)
 
+# split byte string into packets and assign data to channels
 def decode_packets(bytes, channels, parameters):
-    packets = 0
-    errors = 0
+    n_packets = 0
+    n_errors = 0
 
     packet = bytearray()
     def decode():
-        nonlocal packets
-        nonlocal errors
-        packets += 1
+        nonlocal n_packets
+        nonlocal n_errors
+        n_packets += 1
         # split into components
         # verifies packet length (unpack would fail)
         # verifies id (parameters access would fail)
@@ -44,13 +46,13 @@ def decode_packets(bytes, channels, parameters):
             ts, id = struct.unpack('>IH', packet[1:7])
             value = struct.unpack(parameters[id]['format'], packet[7:-1])[0]
         except:
-            errors += 1
+            n_errors += 1
             return
         # verify checksum
         sum = 0
         for b in packet[:-1]: sum += b
         if not sum.to_bytes(2)[-1] == packet[-1]:
-            errors += 1
+            n_errors += 1
             return
         # add to channel
         channels[id]['points'].append((ts, value))
@@ -58,10 +60,12 @@ def decode_packets(bytes, channels, parameters):
     esc = False
     for b in bytes:
         if b == START:
+            # beginning new packet, decode the last one
             decode()
             packet = bytearray()
             packet.append(START)
         elif b == ESC:
+            # escape next byte
             esc = True
         elif esc:
             packet.append(b ^ 0x20)
@@ -70,7 +74,7 @@ def decode_packets(bytes, channels, parameters):
             packet.append(b)
     decode()
         
-    return (packets, errors)
+    return (n_packets, n_errors)
 
 # find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
 # value = encoded_value * 10^-shift * scalar / divisor
@@ -113,27 +117,29 @@ def get_scalars(v_min, v_max):
     
     return (shift, scalar, divisor)
 
+# decode packets from a byte string and organize into channels
 def parse(bytes, parameters):
     channels = {
         id: {
-            # raw data
             'id': id,
             'name': param['name'],
             'unit': param['unit'],
+            # raw data
             'n_points': 0,              # num raw datapoints
-            't_min': 0,                 # min datapoint timestamp
-            't_max': 0,                 # max datapoint timestamp
-            'v_min': 0,                 # min datapoint value
-            'v_max': 0,                 # max datapoint value
             'points': [],
+            't_min': 0,                 # min timestamp
+            't_max': 0,                 # max timestamp
+            'v_min': 0,                 # min value
+            'v_max': 0,                 # max value
             # interpolated data
             'delta_ms': 0,
             'frequency_hz': 0,
-            'sample_count': 0,
+            'sample_count': 0,          # num interpolated datapoints
             't_int': [],                # evenly spaced timestamps
             'v_int': [],                # interpolated values
             # s32 encoded data (on t_int time axis)
             # encoded_value = value / 10^-shift / scalar * divisor
+            # value = encoded_value * 10^-shift * scalar / divisor
             'v_enc': [],
             'shift': 0,
             'scalar': 0,
@@ -145,19 +151,21 @@ def parse(bytes, parameters):
 
     print('decoding packets... ', end='', flush=True)
     start = time.time()
-    packets, errors = decode_packets(bytes, channels, parameters)
-    for id in list(channels.keys()):
-        # remove channels with no data
-        if len(channels[id]['points']) == 0:
-            del channels[id]
+    n_packets, n_errors = decode_packets(bytes, channels, parameters)
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
-    print(f'{packets} packets, {errors} errors')
+    print(f'{n_packets} packets, {n_errors} errors')
+
+    # remove channels with no data
+    for id in list(channels.keys()):
+        channels[id]['n_points'] = len(channels[id]['points'])
+        if channels[id]['n_points'] == 0:
+            print(f'removing empty channel: {channels[id]['name']} ({id})')
+            del channels[id]
 
     print('sorting data... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
-        ch['n_points'] = len(ch['points'])
         # sort points by timestamp
         ch['points'].sort(key=lambda pt: pt[0])
         ch['points'] = np.array(ch['points'], dtype=np.float64)
@@ -175,19 +183,24 @@ def parse(bytes, parameters):
     start = time.time()
     for ch in channels.values():
         # calculate time axis delta / channel frequency
-        delta = 100 # assume 100ms if a channel has a single point
-        if ch['n_points'] > 1:
+        if ch['n_points'] == 1:
+            # single datapoint: use 1Hz by default
+            ch['delta_ms'] = 1000
+            ch['frequency_hz'] = 1
+        else:
+            # multiple datapoints: calculate an appropriate freq
             # find the most common time delta between points
             deltas = np.diff(ch['points'][:,0])
             unique_deltas, counts = np.unique(deltas, return_counts=True)
-            delta = min(int(unique_deltas[counts == counts.max()][0]), 100) # max delta = 100ms
-            # round so that delta & frequency are integers
+            common_delta = int(unique_deltas[counts == counts.max()][0])
+            # force a minimum frequency of 1Hz
+            delta = min(common_delta, 1000)
+            # round so that frequency is an integer
             while 1000 % delta != 0: delta += 1
-        # use this delta to get channel frequency
-        ch['delta_ms'] = delta
-        ch['frequency_hz'] = math.trunc(1000 / ch['delta_ms'])
+            ch['delta_ms'] = delta
+            ch['frequency_hz'] = math.trunc(1000 / delta)
+        # create a new time axis with this frequency
         ch['sample_count'] = math.trunc(ch['t_max'] / ch['delta_ms'])
-        # create a new time axis with this frequency and sample count
         ch['t_int'] = np.arange(0, ch['sample_count']) * ch['delta_ms']
         # interpolate data over the new time axis
         ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
@@ -202,9 +215,10 @@ def parse(bytes, parameters):
             ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(ch['v_min'], ch['v_max'])
         except:
             # encoding failed, remove channel
+            print(f'failed to encode channel: {ch['name']} ({id}) min={ch['v_min']} max={ch['v_max']}')
             del channels[id]
-            print(f'failed to encode channel {id} min={ch['v_min']} max={ch['v_max']}')
         else:
+            # encoded_value = value / 10^-shift / scalar * divisor
             ch['v_enc'] = np.array(
                 [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
                 dtype=np.int32
@@ -215,9 +229,10 @@ def parse(bytes, parameters):
     print(f'created {len(channels)} channels')
     return channels
 
+# plot a channel parsed from a .gdat string
 def plot(ch):
-    plt.suptitle(f"{ch['name']} (ID: {ch['id']})")
-    plt.title(f"{len(ch['points'])} points")
+    plt.suptitle(f"{ch['name']} ({ch['id']})")
+    plt.title(f"{ch['n_points']} points")
     plt.xlabel('time (ms)')
     plt.ylabel(ch['unit'])
 
