@@ -188,7 +188,7 @@ def parse(bytes, parameters):
         ch['frequency_hz'] = math.trunc(1000 / ch['delta_ms'])
         ch['sample_count'] = math.trunc(ch['t_max'] / ch['delta_ms'])
         # create a new time axis with this frequency and sample count
-        ch['t_int'] = np.arange(0, ch['delta_ms'] * ch['sample_count'], ch['delta_ms'])
+        ch['t_int'] = np.arange(0, ch['sample_count']) * ch['delta_ms']
         # interpolate data over the new time axis
         ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
     elapsed = round(time.time() - start, 2)

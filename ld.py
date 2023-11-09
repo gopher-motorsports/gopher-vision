@@ -1,26 +1,21 @@
-# file structure based on logs from the MoTeC EDL3 v5.6
-
-# .ld files are split into several sections linked by file pointers
-# layouts contain a series of (key, format) pairs for each value in a section
-# values with empty keys are unused/unknown
-# key lists and format strings are derived from the corresponding layout
-
-# KEY: identifies the value
-# FORMAT: mapping between byte string and Python value
-# OFFSET (hex): file offset of the value
-# LENGTH (hex): length of the value in bytes
-
 import struct
 import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-layouts = {}
-keys = {}
-formats = {}
+# file structure based on logs from the MoTeC EDL3 v5.6
 
-# HEADER =======================================================================
-layouts['header'] = (
+# .ld files are split into several sections linked by file pointers
+# layouts contain a series of (key, format) pairs for each value in a section
+# values with empty keys are unused/unknown
+# a list of keys and a single combined format string are derived from the corresponding layout
+
+# KEY: identifies the value
+# FORMAT: mapping between byte string and Python value, used in struct.pack/unpack
+# OFFSET (hex): file offset of the value
+# LENGTH (hex): length of the value in bytes
+
+HEADER = ( # ===================================================================
 ###  KEY                FORMAT     OFFSET (h)  LENGTH (h)
     ('',                '<'),      #
     ('sof',             'Q'),      # 0         8         0x40
@@ -29,7 +24,7 @@ layouts['header'] = (
     ('',                '20x'),    # 10        14
     ('event_ptr',       'I'),      # 24        4
     ('',                '24x'),    # 28        18
-    ('magic1',          'H'),      # 40        2         0x0002
+    ('magic1',          'H'),      # 40        2         0x0000
     ('magic2',          'H'),      # 42        2         0x4240
     ('magic3',          'H'),      # 44        2         0x000F
     ('device_serial',   'I'),      # 46        4         21115
@@ -38,7 +33,7 @@ layouts['header'] = (
     ('magic4',          'H'),      # 54        2         0x0080
     ('num_channels',    'H'),      # 56        2
     ('num_channels2',   'H'),      # 58        2
-    ('magic5',          'I'),      # 5A        4         0x000A01F4
+    ('magic5',          'I'),      # 5A        4         0x00050014
     ('date',            '32s'),    # 5E        20
     ('time',            '32s'),    # 7E        20
     ('driver',          '64s'),    # 9E        40
@@ -57,12 +52,12 @@ layouts['header'] = (
     ('',                '46x'),    # 6B4       2E
 )
 
-(k, f) = zip(*layouts['header'])
-keys['header'] = tuple(filter(lambda key: key != '', k))
-formats['header'] = ''.join(f)
+(k, f) = zip(*HEADER)
+HEADER_KEYS = tuple(filter(lambda key: key != '', k))
+HEADER_FMT = ''.join(f)
+HEADER_SIZE = struct.calcsize(HEADER_FMT)
 
-# EVENT ========================================================================
-layouts['event'] = (
+EVENT = ( # ====================================================================
 ###  KEY              FORMAT     OFFSET (h)  LENGTH (h)
     ('',              '<'),      #
     ('event',         '64s'),    # 6E2       40
@@ -73,12 +68,12 @@ layouts['event'] = (
     ('',              '1996x'),  # B6A       7CC
 )
 
-(k, f) = zip(*layouts['event'])
-keys['event'] = tuple(filter(lambda key: key != '', k))
-formats['event'] = ''.join(f)
+(k, f) = zip(*EVENT)
+EVENT_KEYS = tuple(filter(lambda key: key != '', k))
+EVENT_FMT = ''.join(f)
+EVENT_SIZE = struct.calcsize(EVENT_FMT)
 
-# VENUE ========================================================================
-layouts['venue'] = (
+VENUE = ( # ====================================================================
 ###  KEY                FORMAT     OFFSET (h)  LENGTH (h)
     ('',                '<'),      #
     ('venue',           '64s'),    # 1336      40
@@ -90,12 +85,12 @@ layouts['venue'] = (
     ('',                '1968x')   # 17A4      7B0
 )
 
-(k, f) = zip(*layouts['venue'])
-keys['venue'] = tuple(filter(lambda key: key != '', k))
-formats['venue'] = ''.join(f)
+(k, f) = zip(*VENUE)
+VENUE_KEYS = tuple(filter(lambda key: key != '', k))
+VENUE_FMT = ''.join(f)
+VENUE_SIZE = struct.calcsize(VENUE_FMT)
 
-# VEHICLE ======================================================================
-layouts['vehicle'] = (
+VEHICLE = ( # ==================================================================
 ###  KEY                   FORMAT     OFFSET (h)  LENGTH (h)
     ('',                   '<'),      #
     ('vehicle_id',         '64s'),    # 1F54      40
@@ -124,12 +119,12 @@ layouts['vehicle'] = (
     ('',                   '1968x'),  # 2498      7B0
 )
 
-(k, f) = zip(*layouts['vehicle'])
-keys['vehicle'] = tuple(filter(lambda key: key != '', k))
-formats['vehicle'] = ''.join(f)
+(k, f) = zip(*VEHICLE)
+VEHICLE_KEYS = tuple(filter(lambda key: key != '', k))
+VEHICLE_FMT = ''.join(f)
+VEHICLE_SIZE = struct.calcsize(VEHICLE_FMT)
 
-# WEATHER ======================================================================
-layouts['weather'] = (
+WEATHER = ( # ==================================================================
 ###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)
     ('',                 '<'),      #
     ('sky',              '64s'),    # 2C48       40
@@ -148,153 +143,140 @@ layouts['weather'] = (
     ('',                 '776x'),   # 3140       308
 )
 
-(k, f) = zip(*layouts['weather'])
-keys['weather'] = tuple(filter(lambda key: key != '', k))
-formats['weather'] = ''.join(f)
+(k, f) = zip(*WEATHER)
+WEATHER_KEYS = tuple(filter(lambda key: key != '', k))
+WEATHER_FMT = ''.join(f)
+WEATHER_SIZE = struct.calcsize(WEATHER_FMT)
 
-# CHANNEL METADATA =============================================================
 # value = encoded_value * 10^-shift * scalar / divisor
 # encoded_value = value / 10^-shift / scalar * divisor
-# offset wrt meta ptr
-# first meta_ptr at 0x3448
-layouts['ch_meta'] = (
+CH_META = ( # ==================================================================
 ###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)
     ('',                 '<'),      #
-    ('prev_ptr',         'I'),      # 0         4
-    ('next_ptr',         'I'),      # 4         4
-    ('data_ptr',         'I'),      # 8         4
-    ('sample_count',     'I'),      # C         4
-    ('magic1',           'I'),      # 10        4         s16: 0x00030001, s32: 0x0005AA55
-    ('size',             'H'),      # 14        2         s16: 0x02 s32: 0x04
-    ('sample_rate',      'H'),      # 16        2
-    ('offset',           'h'),      # 18        2
-    ('scalar',           'h'),      # 1A        2
-    ('divisor',          'h'),      # 1C        2
-    ('shift',            'h'),      # 1E        2
-    ('name',             '32s'),    # 20        20
-    ('short_name',       '8s'),     # 40        8
-    ('unit',             '12s'),    # 48        C
-    ('',                 '40x'),    # 54        28        sometimes contains nonzero values
+    ('prev_ptr',         'I'),      # +0        4
+    ('next_ptr',         'I'),      # +4        4
+    ('data_ptr',         'I'),      # +8        4
+    ('sample_count',     'I'),      # +C        4
+    ('magic1',           'I'),      # +10       4         s16: 0x00030001, s32: 0x0005AA55
+    ('size',             'H'),      # +14       2         s16: 0x02 s32: 0x04
+    ('sample_rate',      'H'),      # +16       2
+    ('offset',           'h'),      # +18       2
+    ('scalar',           'h'),      # +1A       2
+    ('divisor',          'h'),      # +1C       2
+    ('shift',            'h'),      # +1E       2
+    ('name',             '32s'),    # +20       20
+    ('short_name',       '8s'),     # +40       8
+    ('unit',             '12s'),    # +48       C
+    ('',                 '40x'),    # +54       28
 )
 
-(k, f) = zip(*layouts['ch_meta'])
-keys['ch_meta'] = tuple(filter(lambda key: key != '', k))
-formats['ch_meta'] = ''.join(f)
+(k, f) = zip(*CH_META)
+CH_META_KEYS = tuple(filter(lambda key: key != '', k))
+CH_META_FMT = ''.join(f)
+CH_META_SIZE = struct.calcsize(CH_META_FMT)
 
-# .ld OPERATIONS ===============================================================
+# ==============================================================================
 
-# unpack a section of an .ld file
-def unpack(file, offset, keys, format):
-    file.seek(offset)
-    data = file.read(struct.calcsize(format))
-    # unpack bytes according to format, decoding & trimming strings
-    values = [
-        value.decode().strip().strip('\0') if type(value) is bytes
-        else value
-        for value in struct.unpack(format, data)
-    ]
-    # combine keys & values into a dictionary, ignoring empty keys
-    return {k:v for k,v in zip(keys, values) if k != ''}
-
+# read values from a .ld file according to the formats above
 def parse(path):
-    metadata = {
-        'header': {},
-        'event': {},
-        'venue': {},
-        'vehicle': {},
-        'weather': {},
-        'meta_ptr': {}
-    }
-    channels = {}
     f = open(path, 'rb')
 
-    try: metadata['header'] = unpack(f, 0, keys['header'], formats['header'])
+    def unpack(offset, keys, format):
+        nonlocal f
+        f.seek(offset)
+        data = f.read(struct.calcsize(format))
+        # unpack bytes according to format, decoding & trimming strings
+        values = [
+            value.decode().strip().strip('\0') if type(value) is bytes
+            else value
+            for value in struct.unpack(format, data)
+        ]
+        # match keys to the unpacked values, ignoring empty keys
+        return {k:v for k,v in zip(keys, values) if k != ''}
+
+    try: header = unpack(0, HEADER_KEYS, HEADER_FMT)
     except: print('failed to unpack header')
 
-    if metadata['header']['event_ptr'] > 0:
-        try: metadata['event'] = unpack(f, metadata['header']['event_ptr'], keys['event'], formats['event'])
-        except: print('failed to unpack event')
-    else: print('no event_ptr')
+    try: event = unpack(header['event_ptr'], EVENT_KEYS, EVENT_FMT)
+    except: print('failed to unpack event')
 
-    if metadata['event']['venue_ptr'] > 0:
-        try: metadata['venue'] = unpack(f, metadata['event']['venue_ptr'], keys['venue'], formats['venue'])
-        except: print('failed to unpack venue')
-    else: print('no venue_ptr')
+    try: venue = unpack(event['venue_ptr'], VENUE_KEYS, VENUE_FMT)
+    except: print('failed to unpack venue')
 
-    if metadata['venue']['vehicle_ptr'] > 0:
-        try: metadata['vehicle'] = unpack(f, metadata['venue']['vehicle_ptr'], keys['vehicle'], formats['vehicle'])
-        except: print('failed to unpack vehicle')
-    else: print('no vehicle_ptr')
+    try: vehicle = unpack(venue['vehicle_ptr'], VEHICLE_KEYS, VEHICLE_FMT)
+    except: print('failed to unpack vehicle')
 
-    if metadata['event']['weather_ptr'] > 0:
-        try: metadata['weather'] = unpack(f, metadata['event']['weather_ptr'], keys['weather'], formats['weather'])
-        except: print('failed to unpack weather')
-    else: print('no weather_ptr')
+    try: weather = unpack(event['weather_ptr'], WEATHER_KEYS, WEATHER_FMT)
+    except: print('failed to unpack weather')
 
-    if metadata['header']['meta_ptr'] > 0:
-        next_ch = metadata['header']['meta_ptr']
-        while next_ch:
-            ch = unpack(f, next_ch, keys['ch_meta'], formats['ch_meta'])
-            ch['meta_ptr'] = next_ch
-            next_ch = ch['next_ptr']
+    channels = {}
+    next_ch = header['meta_ptr']
+    while next_ch:
+        ch = unpack(next_ch, CH_META_KEYS, CH_META_FMT)
+        ch['meta_ptr'] = next_ch # not included in the format, but useful to keep
+        next_ch = ch['next_ptr']
 
-            # check for duplicate channel
-            if ch['name'] in channels:
-                print(f"found duplicate channel: \"{ch['name']}\"")
-                continue
-            else:
-                channels[ch['name']] = ch
+        # check for duplicate channel
+        if ch['name'] in channels:
+            print(f"ignoring duplicate channel: \"{ch['name']}\"")
+            continue
+        else:
+            channels[ch['name']] = ch
 
-            # get format for entire data section
-            if ch['size'] == 2:
-                data_fmt = f"<{ch['sample_count']}h"
-            elif ch['size'] == 4:
-                data_fmt = f"<{ch['sample_count']}i"
-            else:
-                print(f"\"{ch['name']}\" has unknown data size ({ch['size']})")
-                continue
+        # get format for entire data section
+        if ch['size'] == 2:
+            data_fmt = f"<{ch['sample_count']}h"
+        elif ch['size'] == 4:
+            data_fmt = f"<{ch['sample_count']}i"
+        else:
+            print(f"\"{ch['name']}\" has unknown data size ({ch['size']})")
+            continue
 
-            # jump to and unpack channel data
-            f.seek(ch['data_ptr'])
-            data = f.read(struct.calcsize(data_fmt))
-            channels[ch['name']]['data'] = [
-                v * 10**-ch['shift'] * ch['scalar'] / ch['divisor']
-                for v in struct.unpack(data_fmt, data)
-            ]
+        # jump to and unpack channel data
+        f.seek(ch['data_ptr'])
+        data = f.read(struct.calcsize(data_fmt))
+        channels[ch['name']]['data'] = [
+            v * 10**-ch['shift'] * ch['scalar'] / ch['divisor']
+            for v in struct.unpack(data_fmt, data)
+        ]
 
-        if len(channels) != metadata['header']['num_channels']:
-            print(f"WARNING: num_channels ({metadata['header']['num_channels']})",
-                  f"does not match number of channels found ({len(channels)})\n")
-    else: print('no meta_pr')
+    if len(channels) != header['num_channels']:
+        print(f"WARNING: num_channels ({header['num_channels']}) does not match number of channels found ({len(channels)})\n")
 
     f.close()
+    metadata = {
+        'header': header,
+        'event': event,
+        'venue': venue,
+        'vehicle': vehicle,
+        'weather': weather
+    }
     return (metadata, channels)
 
+# plot a channel parsed from a .ld file
 def plot(ch):
     plt.suptitle(ch['name'])
     plt.title(f"{ch['sample_count']} samples, {ch['sample_rate']}Hz")
     plt.xlabel('time (s)')
     plt.ylabel(ch['unit'])
 
-    period = 1 / ch['sample_rate']
-    t = np.arange(0, ch['sample_count']) * period
+    t = np.arange(0, ch['sample_count']) * (1 / ch['sample_rate'])
     plt.plot(t, ch['data'], '.')
 
     plt.ticklabel_format(useOffset=False)
     plt.show()
 
+# create a .ld file with the provided channels and timestamp and default metadata
+# see gdat.py for channel data structure
 def write(path, channels, t0):
-    event_offset = struct.calcsize(formats['header'])
-    venue_offset = event_offset + struct.calcsize(formats['event'])
-    vehicle_offset = venue_offset + struct.calcsize(formats['venue'])
-    weather_offset = vehicle_offset + struct.calcsize(formats['vehicle'])
-    meta_offset = weather_offset + struct.calcsize(formats['weather'])
+    event_offset = HEADER_SIZE
+    venue_offset = event_offset + EVENT_SIZE
+    vehicle_offset = venue_offset + VENUE_SIZE
+    weather_offset = vehicle_offset + VEHICLE_SIZE
+    meta_offset = weather_offset + WEATHER_SIZE
+    data_offset = meta_offset + (len(channels) * CH_META_SIZE)
 
-    ch_meta_size = struct.calcsize(formats['ch_meta'])
-    meta_size = len(channels) * ch_meta_size
-    data_offset = meta_offset + meta_size
-
-    # order must match formats['header']
+    # order must match HEADER_FMT
     header_values = {
         'sof': 0x40,
         'meta_ptr': meta_offset,
@@ -309,7 +291,7 @@ def write(path, channels, t0):
         'magic4': 0x0080,
         'num_channels': len(channels),
         'num_channels2': len(channels),
-        'magic5': 327700,
+        'magic5': 0x00050014,
         'date': time.strftime('%d/%m/%Y', t0),
         'time': time.strftime('%H:%M:%S', t0),
         'driver': 'Driver',
@@ -323,7 +305,7 @@ def write(path, channels, t0):
         'team': ''
     }
 
-    # order must match formats['event']
+    # order must match EVENT_FMT
     event_values = {
         'event': 'Event',
         'session': 'Session',
@@ -332,7 +314,7 @@ def write(path, channels, t0):
         'weather_ptr': weather_offset
     }
 
-    # order must match formats['venue']
+    # order must match VENUE_FMT
     venue_values = {
         'venue': 'Venue',
         'venue_length': 0,
@@ -340,7 +322,7 @@ def write(path, channels, t0):
         'venue_category': ''
     }
 
-    # order must match formats['vehicle']
+    # order must match VEHICLE_FMT
     vehicle_values = {
         'vehicle_id': 'VehicleID',
         'vehicle_desc': '',
@@ -366,7 +348,7 @@ def write(path, channels, t0):
         'vehicle_number': ''
     }
 
-    # order must match formats['weather']
+    # order must match WEATHER_FMT
     weather_values = {
         'sky': 'Sunny',
         'air_temp': '',
@@ -383,6 +365,7 @@ def write(path, channels, t0):
         'weather_comment': ''
     }
 
+    # convert strings to utf-8 byte strings
     def enc_str(values):
         return [
             value.encode() if type(value) is str else value
@@ -390,16 +373,17 @@ def write(path, channels, t0):
         ]
 
     print('packing metadata...')
-    header = struct.pack(formats['header'], *enc_str(header_values.values()))
-    event = struct.pack(formats['event'], *enc_str(event_values.values()))
-    venue = struct.pack(formats['venue'], *enc_str(venue_values.values()))
-    vehicle = struct.pack(formats['vehicle'], *enc_str(vehicle_values.values()))
-    weather = struct.pack(formats['weather'], *enc_str(weather_values.values()))
+    header = struct.pack(HEADER_FMT, *enc_str(header_values.values()))
+    event = struct.pack(EVENT_FMT, *enc_str(event_values.values()))
+    venue = struct.pack(VENUE_FMT, *enc_str(venue_values.values()))
+    vehicle = struct.pack(VEHICLE_FMT, *enc_str(vehicle_values.values()))
+    weather = struct.pack(WEATHER_FMT, *enc_str(weather_values.values()))
 
+    print('linking channels...')
     channel_metadata = b''
     data_size = 0
-    print('linking channels...')
     for i, ch in enumerate(channels.values()):
+        # order must match CH_META_FMT
         ch_meta = {
             'prev_ptr': 0,
             'next_ptr': 0,
@@ -418,17 +402,17 @@ def write(path, channels, t0):
         }
 
         if i == 0: ch_meta['prev_ptr'] = 0 # first channel has no prev_ptr
-        else: ch_meta['prev_ptr'] = meta_offset + ch_meta_size * (i - 1)
+        else: ch_meta['prev_ptr'] = meta_offset + CH_META_SIZE * (i - 1)
 
         if i == len(channels) - 1: ch_meta['next_ptr'] = 0 # last channel has no next_ptr
-        else: ch_meta['next_ptr'] = meta_offset + ch_meta_size * (i + 1)
+        else: ch_meta['next_ptr'] = meta_offset + CH_META_SIZE * (i + 1)
 
         data_size += ch_meta['sample_count'] * ch_meta['size']
 
         try:
-            channel_metadata += struct.pack(formats['ch_meta'], *enc_str(ch_meta.values()))
+            channel_metadata += struct.pack(CH_META_FMT, *enc_str(ch_meta.values()))
         except:
-            print(f"failed to pack channel metadata: {ch_meta} (channel {ch['id']})")
+            print(f"failed to pack channel metadata ({ch['id']}): {ch_meta}")
 
     print(f'writing to "{path}"... ', end='', flush=True)
     start = time.time()
@@ -440,8 +424,6 @@ def write(path, channels, t0):
         for ch in channels.values():
             # assumes data has been encoded for a s32
             data = struct.pack(f"<{len(ch['v_enc'])}i", *ch['v_enc'])
-            # assumes data has been encoded for a s16
-            # data = struct.pack(f"<{len(ch['v_enc'])}h", *ch['v_enc'])
             f.write(data)
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
