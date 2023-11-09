@@ -23,20 +23,22 @@ formats = {}
 layouts['header'] = (
 ###  KEY                FORMAT     OFFSET (h)  LENGTH (h)
     ('',                '<'),      #
-    ('sof',             'Q'),      # 0         8
+    ('sof',             'Q'),      # 0         8         0x40
     ('meta_ptr',        'I'),      # 8         4
     ('data_ptr',        'I'),      # C         4
     ('',                '20x'),    # 10        14
     ('event_ptr',       'I'),      # 24        4
-    ('',                '28x'),    # 28        1C
-    ('magic1',          'H'),      # 44        2         15
-    ('device_serial',   'I'),      # 46        4
-    ('device_type',     '8s'),     # 4A        8
-    ('device_version',  'H'),      # 52        2         scale: 100
-    ('magic2',          'H'),      # 54        2         128
+    ('',                '24x'),    # 28        18
+    ('magic1',          'H'),      # 40        2         0x0002
+    ('magic2',          'H'),      # 42        2         0x4240
+    ('magic3',          'H'),      # 44        2         0x000F
+    ('device_serial',   'I'),      # 46        4         21115
+    ('device_type',     '8s'),     # 4A        8         ADL
+    ('device_version',  'H'),      # 52        2         560
+    ('magic4',          'H'),      # 54        2         0x0080
     ('num_channels',    'H'),      # 56        2
     ('num_channels2',   'H'),      # 58        2
-    ('magic3',          'I'),      # 5A        4         66036
+    ('magic5',          'I'),      # 5A        4         0x000A01F4
     ('date',            '32s'),    # 5E        20
     ('time',            '32s'),    # 7E        20
     ('driver',          '64s'),    # 9E        40
@@ -44,12 +46,15 @@ layouts['header'] = (
     ('engine_id',       '64s'),    # 11E       40
     ('venue',           '64s'),    # 15E       40
     ('',                '1088x'),  # 19E       440
-    ('magic4',          'I'),      # 5DE       4         45126145
+    ('magic6',          'I'),      # 5DE       4         0x02B09201
     ('',                '2x'),     # 5E2       2
     ('session',         '64s'),    # 5E4       40
     ('short_comment',   '64s'),    # 624       40
-    ('',                '48x'),    # 664       30
-    ('team',            '64s'),    # 694       40
+    ('',                '8x'),     # 664       8
+    ('magic7',          'H'),      # 66C       2         0x0045
+    ('',                '38x'),    # 66E       26
+    ('team',            '32s'),    # 694       20
+    ('',                '46x'),    # 6B4       2E
 )
 
 (k, f) = zip(*layouts['header'])
@@ -60,11 +65,12 @@ formats['header'] = ''.join(f)
 layouts['event'] = (
 ###  KEY              FORMAT     OFFSET (h)  LENGTH (h)
     ('',              '<'),      #
-    ('event',         '64s'),    # 6D4       40
-    ('session',       '64s'),    # 714       40
-    ('long_comment',  '1024s'),  # 754       400
-    ('venue_ptr',     'I'),      # B54       4
-    ('weather_ptr',   'I'),      # B58       4
+    ('event',         '64s'),    # 6E2       40
+    ('session',       '64s'),    # 722       40
+    ('long_comment',  '1024s'),  # 762       400
+    ('venue_ptr',     'I'),      # B62       4
+    ('weather_ptr',   'I'),      # B66       4
+    ('',              '1996x'),  # B6A       7CC
 )
 
 (k, f) = zip(*layouts['event'])
@@ -75,13 +81,13 @@ formats['event'] = ''.join(f)
 layouts['venue'] = (
 ###  KEY                FORMAT     OFFSET (h)  LENGTH (h)
     ('',                '<'),      #
-    ('venue',           '64s'),    # B5C       40
-    ('',                '2x'),     # B9C       2
-    ('venue_length',    'I'),      # B9E       4         unit: mm
-    ('',                '1028x'),  # BA2       404
-    ('vehicle_ptr',     'I'),      # FA6       4
-    ('venue_category',  '1024s'),  # FAA       400    
-    ('',                '976x')    # 13AA      3D0
+    ('venue',           '64s'),    # 1336      40
+    ('',                '2x'),     # 1376      2
+    ('venue_length',    'I'),      # 1378      4         unit: mm
+    ('',                '1028x'),  # 137C      404
+    ('vehicle_ptr',     'I'),      # 1780      4
+    ('venue_category',  '32s'),    # 1784      20
+    ('',                '1968x')   # 17A4      7B0
 )
 
 (k, f) = zip(*layouts['venue'])
@@ -92,28 +98,30 @@ formats['venue'] = ''.join(f)
 layouts['vehicle'] = (
 ###  KEY                   FORMAT     OFFSET (h)  LENGTH (h)
     ('',                   '<'),      #
-    ('vehicle_id',         '64s'),    # 177A      40
-    ('vehicle_desc',       '64s'),    # 17BA      40
-    ('engine_id',          '64s'),    # 17FA      40
-    ('vehicle_weight',     'H'),      # 183A      2         unit: kg
-    ('fuel_tank',          'H'),      # 183C      2         unit: deciliter
-    ('vehicle_type',       '32s'),    # 183E      20
-    ('driver_type',        '32s'),    # 185E      20
-    ('diff_ratio',         'H'),      # 187E      2         scale: 1000
-    ('gear1',              'H'),      # 1880      2         scale: 1000
-    ('gear2',              'H'),      # 1882      2         scale: 1000
-    ('gear3',              'H'),      # 1884      2         scale: 1000
-    ('gear4',              'H'),      # 1886      2         scale: 1000
-    ('gear5',              'H'),      # 1888      2         scale: 1000
-    ('gear6',              'H'),      # 188A      2         scale: 1000
-    ('gear7',              'H'),      # 188C      2         scale: 1000
-    ('gear8',              'H'),      # 188E      2         scale: 1000
-    ('gear9',              'H'),      # 1890      2         scale: 1000
-    ('gear10',             'H'),      # 1892      2         scale: 1000
-    ('vehicle_track',      'H'),      # 1894      2         unit: mm
-    ('vehicle_wheelbase',  'I'),      # 1896      4         unit: mm
-    ('vehicle_comment',    '1028s'),  # 189A      404
-    ('vehicle_number',     '64s'),    # 1C9E      40
+    ('vehicle_id',         '64s'),    # 1F54      40
+    ('vehicle_desc',       '64s'),    # 1F94      40
+    ('engine_id',          '64s'),    # 1FD4      40
+    ('vehicle_weight',     'H'),      # 2014      2         unit: kg
+    ('fuel_tank',          'H'),      # 2016      2         unit: deciliter
+    ('vehicle_type',       '32s'),    # 2018      20
+    ('driver_type',        '32s'),    # 2038      20
+    ('diff_ratio',         'H'),      # 2058      2
+    ('gear1',              'H'),      # 205A      2
+    ('gear2',              'H'),      # 205C      2
+    ('gear3',              'H'),      # 205E      2
+    ('gear4',              'H'),      # 2060      2
+    ('gear5',              'H'),      # 2062      2
+    ('gear6',              'H'),      # 2064      2
+    ('gear7',              'H'),      # 2066      2
+    ('gear8',              'H'),      # 2068      2
+    ('gear9',              'H'),      # 206A      2
+    ('gear10',             'H'),      # 206C      2
+    ('vehicle_track',      'H'),      # 206E      2         unit: mm
+    ('vehicle_wheelbase',  'I'),      # 2070      4         unit: mm
+    ('vehicle_comment',    '1024s'),  # 2074      400
+    ('',                   '4x'),     # 2474      4
+    ('vehicle_number',     '32s'),    # 2478      20
+    ('',                   '1968x'),  # 2498      7B0
 )
 
 (k, f) = zip(*layouts['vehicle'])
@@ -124,19 +132,20 @@ formats['vehicle'] = ''.join(f)
 layouts['weather'] = (
 ###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)
     ('',                 '<'),      #
-    ('sky',              '64s'),    # 1CDE       40
-    ('air_temp',         '16s'),    # 1D1E       10
-    ('air_temp_unit',    '8s'),     # 1D2E       8
-    ('track_temp',       '16s'),    # 1D36       10
-    ('track_temp_unit',  '8s'),     # 1D46       8
-    ('pressure',         '16s'),    # 1D4E       10
-    ('pressure_unit',    '8s'),     # 1D5E       8
-    ('humidity',         '16s'),    # 1D66       10
-    ('humidity_unit',    '8s'),     # 1D76       8
-    ('wind_speed',       '16s'),    # 1D7E       10
-    ('wind_speed_unit',  '8s'),     # 1D8E       8
-    ('wind_direction',   '64s'),    # 1D96       40
-    ('weather_comment',  '1024s'),  # 1DD6       400
+    ('sky',              '64s'),    # 2C48       40
+    ('air_temp',         '16s'),    # 2C88       10
+    ('air_temp_unit',    '8s'),     # 2C98       8
+    ('track_temp',       '16s'),    # 2CA0       10
+    ('track_temp_unit',  '8s'),     # 2CB0       8
+    ('pressure',         '16s'),    # 2CB8       10
+    ('pressure_unit',    '8s'),     # 2CC8       8
+    ('humidity',         '16s'),    # 2CD0       10
+    ('humidity_unit',    '8s'),     # 2CE0       8
+    ('wind_speed',       '16s'),    # 2CE8       10
+    ('wind_speed_unit',  '8s'),     # 2CF8       8
+    ('wind_direction',   '64s'),    # 2D00       40
+    ('weather_comment',  '1024s'),  # 2D40       400
+    ('',                 '776x'),   # 3140       308
 )
 
 (k, f) = zip(*layouts['weather'])
@@ -147,6 +156,7 @@ formats['weather'] = ''.join(f)
 # value = encoded_value * 10^-shift * scalar / divisor
 # encoded_value = value / 10^-shift / scalar * divisor
 # offset wrt meta ptr
+# first meta_ptr at 0x3448
 layouts['ch_meta'] = (
 ###  KEY                 FORMAT     OFFSET (h)  LENGTH (h)
     ('',                 '<'),      #
@@ -154,8 +164,8 @@ layouts['ch_meta'] = (
     ('next_ptr',         'I'),      # 4         4
     ('data_ptr',         'I'),      # 8         4
     ('sample_count',     'I'),      # C         4
-    ('magic1',           'I'),      # 10        4         196609
-    ('size',             'H'),      # 14        2         2: s16 4: s32
+    ('magic1',           'I'),      # 10        4         s16: 0x00030001, s32: 0x0005AA55
+    ('size',             'H'),      # 14        2         s16: 0x02 s32: 0x04
     ('sample_rate',      'H'),      # 16        2
     ('offset',           'h'),      # 18        2
     ('scalar',           'h'),      # 1A        2
@@ -164,7 +174,7 @@ layouts['ch_meta'] = (
     ('name',             '32s'),    # 20        20
     ('short_name',       '8s'),     # 40        8
     ('unit',             '12s'),    # 48        C
-    ('',                 '40x'),    # 54        28
+    ('',                 '40x'),    # 54        28        sometimes contains nonzero values
 )
 
 (k, f) = zip(*layouts['ch_meta'])
@@ -187,26 +197,38 @@ def unpack(file, offset, keys, format):
     return {k:v for k,v in zip(keys, values) if k != ''}
 
 def parse(path):
-    metadata = {}
+    metadata = {
+        'header': {},
+        'event': {},
+        'venue': {},
+        'vehicle': {},
+        'weather': {},
+        'meta_ptr': {}
+    }
     channels = {}
     f = open(path, 'rb')
 
-    metadata['header'] = unpack(f, 0, keys['header'], formats['header'])
+    try: metadata['header'] = unpack(f, 0, keys['header'], formats['header'])
+    except: print('failed to unpack header')
 
     if metadata['header']['event_ptr'] > 0:
-        metadata['event'] = unpack(f, metadata['header']['event_ptr'], keys['event'], formats['event'])
+        try: metadata['event'] = unpack(f, metadata['header']['event_ptr'], keys['event'], formats['event'])
+        except: print('failed to unpack event')
     else: print('no event_ptr')
 
     if metadata['event']['venue_ptr'] > 0:
-        metadata['venue'] = unpack(f, metadata['event']['venue_ptr'], keys['venue'], formats['venue'])
+        try: metadata['venue'] = unpack(f, metadata['event']['venue_ptr'], keys['venue'], formats['venue'])
+        except: print('failed to unpack venue')
     else: print('no venue_ptr')
 
     if metadata['venue']['vehicle_ptr'] > 0:
-        metadata['vehicle'] = unpack(f, metadata['venue']['vehicle_ptr'], keys['vehicle'], formats['vehicle'])
+        try: metadata['vehicle'] = unpack(f, metadata['venue']['vehicle_ptr'], keys['vehicle'], formats['vehicle'])
+        except: print('failed to unpack vehicle')
     else: print('no vehicle_ptr')
 
     if metadata['event']['weather_ptr'] > 0:
-        metadata['weather'] = unpack(f, metadata['event']['weather_ptr'], keys['weather'], formats['weather'])
+        try: metadata['weather'] = unpack(f, metadata['event']['weather_ptr'], keys['weather'], formats['weather'])
+        except: print('failed to unpack weather')
     else: print('no weather_ptr')
 
     if metadata['header']['meta_ptr'] > 0:
@@ -243,7 +265,6 @@ def parse(path):
         if len(channels) != metadata['header']['num_channels']:
             print(f"WARNING: num_channels ({metadata['header']['num_channels']})",
                   f"does not match number of channels found ({len(channels)})\n")
-            
     else: print('no meta_pr')
 
     f.close()
@@ -275,27 +296,30 @@ def write(path, channels, t0):
 
     # order must match formats['header']
     header_values = {
-        'sof': 7567732375616,
+        'sof': 0x40,
         'meta_ptr': meta_offset,
         'data_ptr': data_offset,
         'event_ptr': event_offset,
-        'magic1': 15,
+        'magic1': 0,
+        'magic2': 0x4240,
+        'magic3': 0x000F,
         'device_serial': 21115,
         'device_type': 'ADL',
         'device_version': 560,
-        'magic2': 128,
+        'magic4': 0x0080,
         'num_channels': len(channels),
         'num_channels2': len(channels),
-        'magic3': 66036,
+        'magic5': 327700,
         'date': time.strftime('%d/%m/%Y', t0),
         'time': time.strftime('%H:%M:%S', t0),
         'driver': 'Driver',
         'vehicle_id': 'VehicleID',
         'engine_id': '',
         'venue': 'Venue',
-        'magic4': 45126145,
+        'magic6': 0x02B09201,
         'session': 'Session',
         'short_comment': 'Comment',
+        'magic7': 0x0045,
         'team': ''
     }
 
@@ -344,7 +368,7 @@ def write(path, channels, t0):
 
     # order must match formats['weather']
     weather_values = {
-        'sky': '',
+        'sky': 'Sunny',
         'air_temp': '',
         'air_temp_unit': '',
         'track_temp': '',
@@ -379,11 +403,11 @@ def write(path, channels, t0):
         ch_meta = {
             'prev_ptr': 0,
             'next_ptr': 0,
-            'data_ptr': 0,
+            'data_ptr': data_offset + data_size,
             'sample_count': len(ch['v_enc']),
-            'magic1': 196609,
-            'size': 2,
-            'sample_rate': ch['sample_rate'],
+            'magic1': 0x0005AA55,
+            'size': 0x04,
+            'sample_rate': ch['frequency_hz'],
             'offset': ch['offset'],
             'scalar': ch['scalar'],
             'divisor': ch['divisor'],
@@ -392,14 +416,14 @@ def write(path, channels, t0):
             'short_name': '',
             'unit': ch['unit'],
         }
-        ch_meta['data_ptr'] = data_offset + data_size
-        data_size += ch_meta['sample_count'] * ch_meta['size']
 
-        if i == 0: ch_meta['prev_ptr'] = 0
+        if i == 0: ch_meta['prev_ptr'] = 0 # first channel has no prev_ptr
         else: ch_meta['prev_ptr'] = meta_offset + ch_meta_size * (i - 1)
 
-        if i == len(channels) - 1: ch_meta['next_ptr'] = 0
+        if i == len(channels) - 1: ch_meta['next_ptr'] = 0 # last channel has no next_ptr
         else: ch_meta['next_ptr'] = meta_offset + ch_meta_size * (i + 1)
+
+        data_size += ch_meta['sample_count'] * ch_meta['size']
 
         try:
             channel_metadata += struct.pack(formats['ch_meta'], *enc_str(ch_meta.values()))
@@ -414,8 +438,10 @@ def write(path, channels, t0):
         # pack data for each channel
         # do this at write time to avoid storing large byte strings in memory
         for ch in channels.values():
+            # assumes data has been encoded for a s32
+            data = struct.pack(f"<{len(ch['v_enc'])}i", *ch['v_enc'])
             # assumes data has been encoded for a s16
-            data = struct.pack(f"<{len(ch['v_enc'])}h", *ch['v_enc'])
+            # data = struct.pack(f"<{len(ch['v_enc'])}h", *ch['v_enc'])
             f.write(data)
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
