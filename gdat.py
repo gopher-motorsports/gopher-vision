@@ -29,47 +29,6 @@ def get_t0(sof):
         print(f'failed to parse timestamp "{sof.decode()}"')
         return time.gmtime(0)
 
-# find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
-# value = encoded_value * 10^-shift * scalar / divisor
-# encoded_value = value / 10^-shift / scalar * divisor
-# to make the most of a s16: abs_max = (2^15 - 1) * 10^-shift * scalar / divisor
-def get_scalars(v_min, v_max):
-    abs_max = max(abs(v_min), abs(v_max))
-
-    exp = 0
-    scale = abs_max
-    scf = 0
-    shift = 0
-    done = False
-
-    if v_max - v_min <= 0.001:
-        if -0.0001 <= abs_max <= 0.0001:
-            exp = 0
-            scale = 1
-        else:
-            exp = 1
-            scale = abs_max
-        scf = 8 * (10**exp) / scale
-        shift = 6 - exp
-        done = True
-
-    exp = -37
-    while exp < 37 and not done:
-        if scale >= 8 * 10**exp and scale < 8 * 10**(exp+1):
-            scf = 8 * 10**exp / scale
-            shift = 6 - exp
-            done = True
-        exp += 1
-
-    if not done:
-        raise Exception('encoding failed')
-    
-    scalar, divisor = Fraction(scf).limit_denominator(2047).as_integer_ratio()
-    if scalar > 2047:
-        raise Exception('encoding failed')
-    
-    return (shift, scalar, divisor)
-
 # decode packets from a byte string and organize into channels
 def parse(bytes, parameters):
     channels = {
@@ -193,18 +152,38 @@ def parse(bytes, parameters):
     start = time.time()
     for id in list(channels.keys()):
         ch = channels[id]
-        try:
-            ch['shift'], ch['scalar'], ch['divisor'] = get_scalars(ch['v_min'], ch['v_max'])
-        except:
-            # encoding failed, remove channel
-            print(f'failed to encode channel: {ch['name']} ({id}) min={ch['v_min']} max={ch['v_max']}')
-            del channels[id]
+        abs_max = max(abs(ch['v_min']), abs(ch['v_max']))
+
+        # find shift, scalar, and divisor to fit value in a s32
+        # encoded_value = value / 10^-shift / scalar * divisor
+        if abs_max == 0:
+            ch['shift'], ch['scalar'], ch['divisor'] = (12, 1, 1)
         else:
-            # encoded_value = value / 10^-shift / scalar * divisor
-            ch['v_enc'] = np.array(
-                [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
-                dtype=np.int32
-            )
+            # find the closest value of 8*10^x to abs_max
+            x = math.floor(math.log10(abs_max / 8))
+            # limit to x >= -6 (max shift of 12)
+            # lower abs_max -> lower x (higher shift), limit prevents encoded values from overflowing
+            x = max(x, -6)
+            # find scale to map abs_max to 8*10^x
+            scale = (8 * 10**x) / abs_max
+            # find shift to map abs_max to 8*10^6
+            shift = 6 - x
+            # float scale -> fraction, limit scalar & divisor to 12 bits (required by .ld format)
+            # idk why but mapping to 8*10^x causes fewer fraction failures than 10^x
+            scalar, divisor = Fraction(scale).limit_denominator(0x7FF).as_integer_ratio()
+            if scalar > 0x7FF:
+                # encoding failed, remove channel
+                print(f'failed to encode channel: {ch['name']} ({id}) abs_max={abs_max}')
+                del channels[id]
+                continue
+            
+            ch['shift'], ch['scalar'], ch['divisor'] = (shift, scalar, divisor)
+
+        # encode values
+        ch['v_enc'] = np.array(
+            [v / 10**-ch['shift'] / ch['scalar'] * ch['divisor'] for v in ch['v_int']],
+            dtype=np.int32
+        )
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
 
