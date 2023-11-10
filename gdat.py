@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 START = 0x7E
 ESC = 0x7D
-MIN_PACKET_LENGTH = 9
+ESC_XOR = 0x20
 
 random.seed()
 start_ms = time.time() * 1000
@@ -28,53 +28,6 @@ def get_t0(sof):
     except:
         print(f'failed to parse timestamp "{sof.decode()}"')
         return time.gmtime(0)
-
-# split byte string into packets and assign data to channels
-def decode_packets(bytes, channels, parameters):
-    n_packets = 0
-    n_errors = 0
-
-    packet = bytearray()
-    def decode():
-        nonlocal n_packets
-        nonlocal n_errors
-        n_packets += 1
-        # split into components
-        # verifies packet length (unpack would fail)
-        # verifies id (parameters access would fail)
-        try:
-            ts, id = struct.unpack('>IH', packet[1:7])
-            value = struct.unpack(parameters[id]['format'], packet[7:-1])[0]
-        except:
-            n_errors += 1
-            return
-        # verify checksum
-        sum = 0
-        for b in packet[:-1]: sum += b
-        if not sum.to_bytes(2)[-1] == packet[-1]:
-            n_errors += 1
-            return
-        # add to channel
-        channels[id]['points'].append((ts, value))
-
-    esc = False
-    for b in bytes:
-        if b == START:
-            # beginning new packet, decode the last one
-            decode()
-            packet = bytearray()
-            packet.append(START)
-        elif b == ESC:
-            # escape next byte
-            esc = True
-        elif esc:
-            packet.append(b ^ 0x20)
-            esc = False
-        else:
-            packet.append(b)
-    decode()
-        
-    return (n_packets, n_errors)
 
 # find shift, scalar, and divisor to fit value in a s16 [-2^15, 2^15 - 1]
 # value = encoded_value * 10^-shift * scalar / divisor
@@ -125,18 +78,18 @@ def parse(bytes, parameters):
             'name': param['name'],
             'unit': param['unit'],
             # raw data
-            'n_points': 0,              # num raw datapoints
+            'n_points': 0,         # num raw datapoints
             'points': [],
-            't_min': 0,                 # min timestamp
-            't_max': 0,                 # max timestamp
-            'v_min': 0,                 # min value
-            'v_max': 0,                 # max value
+            't_min': 0,            # min timestamp
+            't_max': 0,            # max timestamp
+            'v_min': 0,            # min value
+            'v_max': 0,            # max value
             # interpolated data
             'delta_ms': 0,
             'frequency_hz': 0,
-            'sample_count': 0,          # num interpolated datapoints
-            't_int': [],                # evenly spaced timestamps
-            'v_int': [],                # interpolated values
+            'sample_count': 0,     # num interpolated datapoints
+            't_int': [],           # evenly spaced timestamps
+            'v_int': [],           # interpolated values
             # s32 encoded data (on t_int time axis)
             # encoded_value = value / 10^-shift / scalar * divisor
             # value = encoded_value * 10^-shift * scalar / divisor
@@ -151,10 +104,39 @@ def parse(bytes, parameters):
 
     print('decoding packets... ', end='', flush=True)
     start = time.time()
-    n_packets, n_errors = decode_packets(bytes, channels, parameters)
+    n_errors = 0
+    # split byte string by start delimiter
+    packets = bytes.split(START.to_bytes())
+    for packet in packets:
+        # unescape packet
+        pkt = bytearray()
+        esc = False
+        for b in packet:
+            if b == ESC:
+                esc = True
+            elif esc:
+                pkt.append(b ^ ESC_XOR)
+                esc = False
+            else:
+                pkt.append(b)
+        # unpack components
+        try:
+            ts, id = struct.unpack('>IH', pkt[0:6])
+            value = struct.unpack(parameters[id]['format'], pkt[6:-1])[0]
+        except:
+            n_errors += 1
+            continue
+        # validate checksum
+        sum = START
+        for b in pkt[:-1]: sum += b
+        if sum.to_bytes(2)[-1] != pkt[-1]:
+            n_errors += 1
+            continue
+        # at this point, packet is valid, add to channel
+        channels[id]['points'].append((ts, value))
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
-    print(f'{n_packets} packets, {n_errors} errors')
+    print(f'{len(packets)} packets, {n_errors} errors')
 
     # remove channels with no data
     for id in list(channels.keys()):
