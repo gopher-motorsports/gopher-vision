@@ -40,7 +40,7 @@ def load(path):
     print(f'loading {path.name} ...')
     match path.suffix:
         case '.yaml':
-            parameters = gcan.load_config(path)
+            parameters = gcan.load(path.name)
             print(f'loaded {len(parameters)} parameters')
             paths['config'] = path
         case '.gdat':
