@@ -56,6 +56,7 @@ def load(config_name):
             'id': id,
             'name': v.get('motec_name', ''),
             'unit': v.get('unit', ''),
+            'type': type,
             **TYPES[type]
         }
     return parameters

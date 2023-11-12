@@ -26,7 +26,7 @@ def get_t0(sof):
     try:
         return time.strptime(sof.decode(), '/PLM_%Y-%m-%d-%H-%M-%S')
     except:
-        print(f'failed to parse timestamp "{sof.decode()}"')
+        print(f'WARNING: failed to parse timestamp "{sof.decode()}"')
         return time.gmtime(0)
 
 # decode packets from a byte string and organize into channels
@@ -36,6 +36,7 @@ def parse(bytes, parameters):
             'id': id,
             'name': param['name'],
             'unit': param['unit'],
+            'type': param['type'],
             # raw data
             'n_points': 0,         # num raw datapoints
             'points': [],
@@ -173,7 +174,7 @@ def parse(bytes, parameters):
             scalar, divisor = Fraction(scale).limit_denominator(0x7FF).as_integer_ratio()
             if scalar > 0x7FF:
                 # encoding failed, remove channel
-                print(f'failed to encode channel: {ch['name']} ({id}) abs_max={abs_max}')
+                print(f'WARNING: failed to encode channel: {ch['name']} ({id}) abs_max={abs_max}')
                 del channels[id]
                 continue
             

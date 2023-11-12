@@ -5,9 +5,9 @@ name = "pypi"
 
 [packages]
 pyyaml = "*"
-tabulate = "*"
 numpy = "*"
 matplotlib = "*"
+rich = "*"
 
 [dev-packages]
 

@@ -1,131 +1,82 @@
 **GopherVision** is a collection of Python utilities for interacting with Gopher Motorsports data.
 
 ## Installation
-First, install [Python 3.12](https://www.python.org/downloads/release/python-3120/) and [Pipenv](https://pipenv.pypa.io/en/latest/installation/). Then:
-
+1. Install [Python 3.12](https://www.python.org/downloads/release/python-3120/)
+2. Install [Pipenv](https://pipenv.pypa.io/en/latest/): `pip install --user pipenv`
+3. Clone the project and install dependencies:
 ```
 git clone https://github.com/gopher-motorsports/gopher-vision.git
 cd gopher-vision
 pipenv install
 ```
 
-Pipenv is used to manage package dependencies in a virtual environment. It must be activated before running any scripts in GopherVision. You can either:
-```
-pipenv shell
-python go4v.py ...
-pipenv exit
-```
-or
-```
-pipenv run python go4v.py ...
-```
-
 ## Usage
-```
-pipenv run python go4v.py
-```
+### GUI
+*coming soon...*
 
-`go4v.py` opens an interactive console with several commands available:
-```
->>> help()
--------------  -----------------------------------------------------------------------------
-load(path)     load a .gdat, .ld, or GopherCAN config (.yaml) into memory and parse the data
-info()         print basic info on currently loaded data
-info_config()  print detailed info on a loaded GopherCAN config
-info_gdat()    print detailed info on a loaded .gdat file
-info_ld()      print detailed info on a loaded .ld file
-plot_gdat(id)  plot .gdat channel data
-plot_ld(name)  plot .ld channel data
-convert(path)  convert the currently loaded .gdat to a .ld at "path"
-help()         print available commands
-exit()         exit the console
--------------  -----------------------------------------------------------------------------
-```
+### CLI
+Start the GopherVision console:
+```console
+$ pipenv run python cli.py
 
-**WARNING:** When using the console, backslashes in path arguments must be escaped. Use `load("configs\\go4-23c.yaml")` instead of `load("configs\go4-23c.yaml")`.
+Welcome to GopherVision. Enter ? to list commands.
 
-### Shortcuts
+(GopherVision) ?
 
-Shortcuts are provided for some common use cases to avoid using the console every time.
+Documented commands (type help <topic>):
+========================================
+convert  exit  help  info  load  plot
 
-#### `convert`
 
-```
-pipenv run python go4v.py convert go4-23c.yaml data/9-17-IC.gdat
+(GopherVision)
 ```
 
-Assumes the GopherCAN config exists in a sibling directory:
-```
-../gophercan-lib/network_autogen/configs/go4-23c.yaml
-```
+Get help with a command:
+```console
+(GopherVision) help convert
+convert a .gdat file (or folder of .gdat files) to .ld
 
-The .ld file will be output next to the .gdat.
+        convert [GOPHERCAN CONFIG NAME] [PATH TO .gdat]
+        e.g. "convert go4-23c.yaml statefair.gdat"
 
-You can also convert an entire folder of .gdat files:
-```
-pipenv run python go4v.py convert go4-23c.yaml data/
-```
-
-#### `preload`
-
-```
-pipenv run python go4v.py preload go4-23c.yaml data/9-17-IC.gdat
+        convert [GOPHERCAN CONFIG NAME] [PATH TO FOLDER]
+        e.g. "convert go4-23c.yaml data/"
 ```
 
-After loading the GopherCAN config and .gdat file, the interactive console opens. From here, you can plot channels, convert to .ld, etc.
-
-### Example
-
-A console interface enables some useful workflows like:
-
-1. Loading a .gdat file and the associated GopherCAN config:
-```
-Welcome to Gopher Vision! (Python 3.11.3)
-run help() to print available commands
->>> load("...\\gophercan-lib\\network_autogen\\configs\\go4-23c.yaml")
-loading go4-23c.yaml ...
-building parameter dictionary...
-loaded 108 parameters
->>> load("9-17-IC.gdat")
-loading 9-17-IC.gdat ...
-read 25003214 bytes of data
-parsing data...
-parsed 2108461 packets, 1367 errors
-interpolating data...
-created 108 channels
+Convert a `.gdat` file to `.ld`:
+```console
+(GopherVision) convert go4-23c.yaml data/mock_endurance.gdat
+loaded GopherCAN config: ..\gophercan-lib\network_autogen\configs\go4-23c.yaml
+loading data\mock_endurance.gdat ...
+...
+writing to "data\mock_endurance.ld"... (0.5s)
 ```
 
-2. Then converting to a .ld:
-```
->>> convert("9-17-IC.ld")
-encoding channels...
-converting 9-17-IC.gdat to .ld ...
-packing metadata...
-writing to 9-17-IC.ld ...
-```
+Inspect the data in a `.gdat` file:
+```console
+(GopherVision) load go4-23c.yaml data/cooling_test.gdat
+loaded GopherCAN config: ..\gophercan-lib\network_autogen\configs\go4-23c.yaml
+loading data\cooling_test.gdat ...
+...
+created 117 channels
+loaded in (26.08s)
 
-3. Finding an interesting channel:
-
-<p align="center">
-  <img width="500" src="img/i2.png">
-</p>
-
-4. And inspecting how the raw, interpolated, and encoded/decoded data series compare:
-
-```
->>> info_gdat()
-gdat path: 9-17-IC.gdat
-108 channels
-
-  id  name                          unit      shift    scalar    divisor    offset    sample_rate    points
-----  ----------------------------  ------  -------  --------  ---------  --------  -------------  --------
-   1  Engine RPM                    rpm           4     32767         18         0            199     48154
-   ...
-
->>> plot_gdat(1)
+(GopherVision) info gdat
+path: data\cooling_test.gdat
+t0: Tue Oct 22 14:07:06 2052
+      ╷                              ╷       ╷            ╷          ╷        ╷           ╷                      ╷                     ╷              ╷              ╷       ╷        ╷         ╷
+  id  │ name                         │ unit  │ type       │ n_points │ t_min  │ t_max     │ v_min                │ v_max               │ frequency_hz │ sample_count │ shift │ scalar │ divisor │ offset  
+╶─────┼──────────────────────────────┼───────┼────────────┼──────────┼────────┼───────────┼──────────────────────┼─────────────────────┼──────────────┼──────────────┼───────┼────────┼─────────┼────────╴
+  1   │ Engine RPM                   │ rpm   │ UNSIGNED16 │ 225396   │ 354.0  │ 1131077.0 │ 0.0                  │ 3367.0              │ 200          │ 226215       │ 4     │ 297    │ 1250    │ 0
+  2   │ Engine Temp                  │ C     │ FLOATING   │ 56445    │ 356.0  │ 1131072.0 │ 9.100000381469727    │ 73.70000457763672   │ 50           │ 56553        │ 6     │ 80     │ 737     │ 0
+  3   │ Eng Oil Pres                 │ kPa   │ FLOATING   │ 56434    │ 356.0  │ 1131072.0 │ 101.30000305175781   │ 581.0               │ 50           │ 56553        │ 5     │ 80     │ 581     │ 0
+  4   │ Eng Oil Temp                 │ C     │ FLOATING   │ 56427    │ 356.0  │ 1131072.0 │ 8.699999809265137    │ 46.60000228881836   │ 50           │ 56553        │ 6     │ 40     │ 233     │ 0
+...
 ```
 
-<p align="center">
-  <img width="500" src="img/plot.png">
-  <img width="500" src="img/plot-zoomed.png">
-</p>
+Exit the console:
+```console
+(GopherVision) exit
+```
+
+Use `?` and `help` to learn how to use all of the commands.

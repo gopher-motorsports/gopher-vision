@@ -195,19 +195,19 @@ def parse(path):
         return {k:v for k,v in zip(keys, values) if k != ''}
 
     try: header = unpack(0, HEADER_KEYS, HEADER_FMT)
-    except: print('failed to unpack header')
+    except: print('ERROR: failed to unpack header')
 
     try: event = unpack(header['event_ptr'], EVENT_KEYS, EVENT_FMT)
-    except: print('failed to unpack event')
+    except: print('WARNING: failed to unpack event')
 
     try: venue = unpack(event['venue_ptr'], VENUE_KEYS, VENUE_FMT)
-    except: print('failed to unpack venue')
+    except: print('WARNING: failed to unpack venue')
 
     try: vehicle = unpack(venue['vehicle_ptr'], VEHICLE_KEYS, VEHICLE_FMT)
-    except: print('failed to unpack vehicle')
+    except: print('WARNING: failed to unpack vehicle')
 
     try: weather = unpack(event['weather_ptr'], WEATHER_KEYS, WEATHER_FMT)
-    except: print('failed to unpack weather')
+    except: print('WARNING: failed to unpack weather')
 
     channels = {}
     next_ch = header['meta_ptr']
@@ -218,7 +218,7 @@ def parse(path):
 
         # check for duplicate channel
         if ch['name'] in channels:
-            print(f"ignoring duplicate channel: \"{ch['name']}\"")
+            print(f"WARNING: ignoring duplicate channel \"{ch['name']}\"")
             continue
         else:
             channels[ch['name']] = ch
@@ -229,7 +229,7 @@ def parse(path):
         elif ch['size'] == 4:
             data_fmt = f"<{ch['sample_count']}i"
         else:
-            print(f"\"{ch['name']}\" has unknown data size ({ch['size']})")
+            print(f"WARNING: \"{ch['name']}\" has unknown data size ({ch['size']})")
             continue
 
         # jump to and unpack channel data
@@ -241,9 +241,10 @@ def parse(path):
         ]
 
     if len(channels) != header['num_channels']:
-        print(f"WARNING: num_channels ({header['num_channels']}) does not match number of channels found ({len(channels)})\n")
+        print(f"WARNING: num_channels ({header['num_channels']}) does not match number of channels found ({len(channels)})")
 
     f.close()
+    print(f'loaded {len(channels)} channels')
     metadata = {
         'header': header,
         'event': event,
