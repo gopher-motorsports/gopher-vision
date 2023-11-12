@@ -1,6 +1,5 @@
 import time
 import struct
-import random
 import numpy as np
 import math
 from fractions import Fraction
@@ -18,9 +17,6 @@ import matplotlib.pyplot as plt
 START = 0x7E
 ESC = 0x7D
 ESC_XOR = 0x20
-
-random.seed()
-start_ms = time.time() * 1000
 
 def get_t0(sof):
     try:
