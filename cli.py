@@ -5,9 +5,9 @@ from rich.table import Table
 from rich import box
 import time
 
-import gcan
-import gdat
-import ld
+from lib import gcan
+from lib import gdat
+from lib import ld
 
 console = Console()
 
