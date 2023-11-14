@@ -137,11 +137,24 @@ def parse(bytes, parameters):
             while 1000 % delta != 0: delta += 1
             ch['delta_ms'] = delta
             ch['frequency_hz'] = math.trunc(1000 / delta)
-        # create a new time axis with this frequency
         ch['sample_count'] = math.trunc(ch['t_max'] / ch['delta_ms'])
-        ch['t_int'] = np.arange(0, ch['sample_count']) * ch['delta_ms']
-        # interpolate data over the new time axis
-        ch['v_int'] = np.interp(ch['t_int'], ch['points'][:,0], ch['points'][:,1])
+
+        # create a new time axis with this time delta and sample count
+        t_int = list(range(0, ch['sample_count'] * ch['delta_ms'], ch['delta_ms']))
+
+        # for each tick in the new time axis, use the closest recorded datapoint
+        # "closest" means the last point with a timestamp less than the tick
+        # this produces a curve that slightly lags the recorded data, but with accurate values
+        v_int = []
+        i = 0
+        for t in t_int:
+            # skip forward to a point with timestamp ~t
+            while i+1 < ch['n_points'] and t > ch['points'][i+1][0]:
+                i += 1
+            v_int.append(ch['points'][i][1])
+
+        ch['t_int'] = np.array(t_int, dtype=np.float64)
+        ch['v_int'] = np.array(v_int, dtype=np.float64)
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
 

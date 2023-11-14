@@ -2,3 +2,4 @@
 *.ld
 *.ldx
 __pycache__
+*.bak
