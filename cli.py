@@ -4,6 +4,7 @@ from rich.console import Console
 from rich.table import Table
 from rich import box
 import time
+import numpy as np
 
 from lib import gcan
 from lib import gdat
@@ -209,6 +210,28 @@ class Shell(cmd.Cmd):
 
         else:
             console.print('ERROR: invalid syntax, try "help plot"', style='red')
+
+    def do_query(self, arg):
+        '''get the closest datapoints in a gdat channel to a specified timestamp (in seconds)
+
+        query [id] [time]
+        e.g. "query 1 169.420"
+        '''
+        args = arg.split()
+        id = int(args[0])
+        t = float(args[1]) * 1000
+        if id in self.gdat_channels:
+            ch = self.gdat_channels[id]
+            i = np.searchsorted(ch['points'][:,0], t)
+
+            print(f'{ch['name']} ({ch['unit']})')
+            print(f'points near t = {t}ms ...')
+            if i > 0:
+                print(f't = {ch['points'][i-1][0]}ms, v = {ch['points'][i-1][1]}')
+            if i < ch['n_points']:
+                print(f't = {ch['points'][i][0]}ms, v = {ch['points'][i][1]}') 
+        else:
+            console.print(f'ERROR: {id} is not a gdat channel', style='red')
 
     def do_exit(self, arg):
         '''exit the console'''
