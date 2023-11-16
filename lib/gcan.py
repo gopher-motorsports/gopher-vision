@@ -14,28 +14,8 @@ TYPES = {
     'FLOATING' : { 'size': 4, 'format': '>f', 'signed': True }
 }
 
-# load parameters from a GopherCAN configuration
-# config_name is something like "go4-23c.yaml"
-def load(config_name):
-    path = Path('../gophercan-lib/network_autogen/configs/') / config_name
-    url = f'https://raw.githubusercontent.com/gopher-motorsports/gophercan-lib/master23/network_autogen/configs/{config_name}'
-    try:
-        # look for the config in a sibling directory
-        with open(path) as f:
-            config = yaml.safe_load(f)
-            print(f'loaded GopherCAN config: {path}')
-    except:
-        print(f'WARNING: no config found at "{path}"')
-        try:
-            # try fetching from gophercan-lib
-            print('checking GitHub...')
-            with urllib.request.urlopen(url) as f:
-                config = yaml.safe_load(f)
-                print(f'loaded GopherCAN config: {url}')
-        except:
-            raise Exception(f'ERROR: failed to load "{config_name}"')
-    
-    # build parameter dictionary
+# build a parameter dictionary from a GopherCAN config
+def get_params(config: dict):
     parameters = {}
     for k,v in config['parameters'].items():
         id = v.get('id')
@@ -59,4 +39,33 @@ def load(config_name):
             'type': type,
             **TYPES[type]
         }
+    print(f'found {len(parameters)} parameters')
     return parameters
+
+# load a GopherCAN config from a local path
+def load_path(path: Path):
+    with open(path) as f:
+        config = yaml.safe_load(f)
+    print(f'loaded GopherCAN config: {path}')
+    return config
+
+# load a GopherCAN config from a URL (gophercan-lib GitHub repo)
+def load_url(url: str):
+    with urllib.request.urlopen(url) as f:
+        config = yaml.safe_load(f)
+    print(f'loaded GopherCAN config: {url}')
+    return config
+
+# load a GopherCAN config by a name like "go4-23c.yaml"
+def load(name: str):
+    path = Path('../gophercan-lib/network_autogen/configs/') / name
+    url = f'https://raw.githubusercontent.com/gopher-motorsports/gophercan-lib/master23/network_autogen/configs/{name}'
+    try:
+        config = load_path(path)
+    except:
+        print(f'WARNING: no config found at "{path}", checking GitHub...')
+        try:
+            config = load_url(url)
+        except:
+            raise Exception(f'ERROR: failed to load "{name}"')
+    return get_params(config)
