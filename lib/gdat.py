@@ -167,13 +167,13 @@ def parse(bytes, parameters):
         # find shift, scalar, and divisor to fit value in a s32
         # encoded_value = value / 10^-shift / scalar * divisor
         if abs_max == 0:
-            ch['shift'], ch['scalar'], ch['divisor'] = (12, 1, 1)
+            ch['shift'], ch['scalar'], ch['divisor'] = (9, 1, 1)
         else:
             # find the closest value of 8*10^x to abs_max
             x = math.floor(math.log10(abs_max / 8))
-            # limit to x >= -6 (max shift of 12)
+            # limit to x >= -3 (max shift/decimal places of 9)
             # lower abs_max -> lower x (higher shift), limit prevents encoded values from overflowing
-            x = max(x, -6)
+            x = max(x, -3)
             # find scale to map abs_max to 8*10^x
             scale = (8 * 10**x) / abs_max
             # find shift to map abs_max to 8*10^6
