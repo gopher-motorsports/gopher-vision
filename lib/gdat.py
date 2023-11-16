@@ -131,8 +131,8 @@ def parse(bytes, parameters):
             deltas = np.diff(ch['points'][:,0])
             unique_deltas, counts = np.unique(deltas, return_counts=True)
             common_delta = int(unique_deltas[counts == counts.max()][0])
-            # force a minimum frequency of 1Hz
-            delta = min(common_delta, 1000)
+            # force a max delta of 100ms (minimum frequency of 10Hz)
+            delta = min(common_delta, 100)
             # round so that frequency is an integer
             while 1000 % delta != 0: delta += 1
             ch['delta_ms'] = delta
