@@ -110,41 +110,50 @@ def parse(bytes, parameters):
         # timestamps = ch['points'][:,0]
         # values     = ch['points'][:,1]
 
-        ch['t_min'] = ch['points'][:,0].min()
-        ch['t_max'] = ch['points'][:,0].max()
+        ch['t_min'] = ch['points'][0,0]
+        ch['t_max'] = ch['points'][-1,0]
         ch['v_min'] = ch['points'][:,1].min()
         ch['v_max'] = ch['points'][:,1].max()
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
 
-    print('interpolating data... ', end='', flush=True)
+    print('calculating sample rates... ', end='', flush=True)
     start = time.time()
     for ch in channels.values():
-        # calculate time axis delta / channel frequency
+        # single datapoint: use 1Hz by default
         if ch['n_points'] == 1:
-            # single datapoint: use 1Hz by default
             ch['delta_ms'] = 1000
             ch['frequency_hz'] = 1
+        # multiple datapoints: calculate an appropriate frequency
         else:
-            # multiple datapoints: calculate an appropriate freq
-            # find the most common time delta between points
+            # get time delta between points
             deltas = np.diff(ch['points'][:,0])
-            unique_deltas, counts = np.unique(deltas, return_counts=True)
-            common_delta = int(unique_deltas[counts == counts.max()][0])
-            # force a max delta of 100ms (minimum frequency of 10Hz)
-            delta = min(common_delta, 100)
+            # remove deltas above 100ms (minimum frequency of 10Hz)
+            deltas = deltas[deltas <= 100]
+            if len(deltas) == 0:
+                delta = 100
+            else:
+                # find the most common delta
+                unique_deltas, counts = np.unique(deltas, return_counts=True)
+                delta = int(unique_deltas[counts == counts.max()].min())
             # round so that frequency is an integer
             while 1000 % delta != 0: delta += 1
             ch['delta_ms'] = delta
             ch['frequency_hz'] = math.trunc(1000 / delta)
+        # calculate sample count needed to reach final datapoint at this frequency
         ch['sample_count'] = math.trunc(ch['t_max'] / ch['delta_ms'])
+    elapsed = round(time.time() - start, 2)
+    print(f'({elapsed}s)')
 
-        # create a new time axis with this time delta and sample count
+    print('fitting to time axis... ', end='', flush=True)
+    start = time.time()
+    for ch in channels.values():
+        # create a new time axis with this channel's time delta and sample count
         t_int = list(range(0, ch['sample_count'] * ch['delta_ms'], ch['delta_ms']))
 
         # for each tick in the new time axis, use the closest recorded datapoint
         # "closest" means the last point with a timestamp less than the tick
-        # this produces a curve that slightly lags the recorded data, but with accurate values
+        # this produces a curve that sometimes slightly lags the recorded data
         v_int = []
         i = 0
         for t in t_int:
@@ -158,7 +167,7 @@ def parse(bytes, parameters):
     elapsed = round(time.time() - start, 2)
     print(f'({elapsed}s)')
 
-    print('encoding channels... ', end='', flush=True)
+    print('encoding... ', end='', flush=True)
     start = time.time()
     for id in list(channels.keys()):
         ch = channels[id]
