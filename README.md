@@ -12,7 +12,11 @@ pipenv install
 
 ## Usage
 ### GUI
-*coming soon...*
+```
+pipenv run pyinstaller gui.py
+```
+
+The executable is created at `dist/gui/gui.exe`.
 
 ### CLI
 Start the GopherVision console:

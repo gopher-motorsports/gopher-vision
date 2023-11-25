@@ -8,6 +8,7 @@ pyyaml = "*"
 numpy = "*"
 matplotlib = "*"
 rich = "*"
+pyinstaller = "*"
 
 [dev-packages]
 
