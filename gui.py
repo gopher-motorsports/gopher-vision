@@ -16,12 +16,7 @@ def load_config():
         title='Select a GopherCAN configuration',
         filetypes=[('YAML', '*.yaml')]
     )
-    try:
-        parameters = gcan.get_params(gcan.load_path(path))
-        yaml_path.config(text=path)
-    except:
-        yaml_path.config(text='failed to load')
-        raise
+    parameters = gcan.get_params(gcan.load_path(path))
 
 def convert():
     global parameters
@@ -61,9 +56,6 @@ yaml_frame = ttk.Frame(root_frame)
 yaml_frame.pack(fill='x')
 ttk.Label(yaml_frame, text="Select a GopherCAN config (.yaml):").pack(side='left')
 ttk.Button(yaml_frame, text='Browse', command=load_config).pack(side='left')
-
-yaml_path = ttk.Label(root_frame, anchor='w', foreground='#eb4034', text='')
-yaml_path.pack(fill='x')
 
 gdat_frame = ttk.Frame(root_frame)
 gdat_frame.pack(fill='x')
