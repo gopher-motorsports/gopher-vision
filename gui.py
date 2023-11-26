@@ -10,13 +10,14 @@ from lib import ld
 parameters = {}
 
 def load_config():
-    global yaml_path
+    global yaml_name
     global parameters
     path = filedialog.askopenfilename(
         title='Select a GopherCAN configuration',
         filetypes=[('YAML', '*.yaml')]
     )
     parameters = gcan.get_params(gcan.load_path(path))
+    yaml_name['text'] = f'Loaded: {path}'
 
 def convert():
     global parameters
@@ -54,12 +55,14 @@ root_frame.pack()
 
 yaml_frame = ttk.Frame(root_frame)
 yaml_frame.pack(fill='x')
-ttk.Label(yaml_frame, text="Select a GopherCAN config (.yaml):").pack(side='left')
+ttk.Label(yaml_frame, text='Select a GopherCAN config (.yaml):').pack(side='left')
 ttk.Button(yaml_frame, text='Browse', command=load_config).pack(side='left')
+yaml_name = ttk.Label(root_frame, anchor='w', foreground='#c203fc', text='no config loaded')
+yaml_name.pack(fill='x')
 
 gdat_frame = ttk.Frame(root_frame)
 gdat_frame.pack(fill='x')
-ttk.Label(gdat_frame, text="Select one or more data files to convert (.gdat):").pack(side='left')
+ttk.Label(gdat_frame, text='Select one or more data files to convert (.gdat):').pack(side='left')
 ttk.Button(gdat_frame, text='Convert', command=convert).pack(side='left')
 
 root.mainloop()
