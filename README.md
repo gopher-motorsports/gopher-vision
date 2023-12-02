@@ -1,8 +1,13 @@
 **GopherVision** is a collection of Python utilities for interacting with Gopher Motorsports data.
 
+_Just want the GUI?_ Vist [Releases](https://github.com/gopher-motorsports/gopher-vision/releases) to download the latest `GopherVision.exe` under "Assets".
+
 ## Installation
 1. Install [Python 3.12](https://www.python.org/downloads/release/python-3120/)
-2. Install [Pipenv](https://pipenv.pypa.io/en/latest/): `pip install --user pipenv`
+2. Install [Pipenv](https://pipenv.pypa.io/en/latest/):
+```
+pip install --user pipenv
+```
 3. Clone the project and install dependencies:
 ```
 git clone https://github.com/gopher-motorsports/gopher-vision.git
@@ -12,7 +17,12 @@ pipenv install
 
 ## Usage
 ### GUI
-*coming soon...*
+**Option 1:** [Download](https://github.com/gopher-motorsports/gopher-vision/releases) and run `GopherVision.exe`
+
+**Option 2:** Run the script:
+```
+$ pipenv run python gui.py
+```
 
 ### CLI
 Start the GopherVision console:
@@ -80,3 +90,10 @@ Exit the console:
 ```
 
 Use `?` and `help` to learn how to use all of the commands.
+
+## Contributing
+
+Build `GopherVision.exe`:
+```
+pipenv run pyinstaller gui.py --onefile --distpath ./ --name GopherVision
+```

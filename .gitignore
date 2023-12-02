@@ -3,3 +3,6 @@
 *.ldx
 __pycache__
 *.bak
+build/
+GopherVision.exe
+GopherVision.spec
