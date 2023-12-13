@@ -224,12 +224,12 @@ class Shell(cmd.Cmd):
             ch = self.gdat_channels[id]
             i = np.searchsorted(ch['points'][:,0], t)
 
-            print(f'{ch['name']} ({ch['unit']})')
+            print(f"{ch['name']} ({ch['unit']})")
             print(f'points near t = {t}ms ...')
             if i > 0:
-                print(f't = {ch['points'][i-1][0]}ms, v = {ch['points'][i-1][1]}')
+                print(f"t = {ch['points'][i-1][0]}ms, v = {ch['points'][i-1][1]}")
             if i < ch['n_points']:
-                print(f't = {ch['points'][i][0]}ms, v = {ch['points'][i][1]}') 
+                print(f"t = {ch['points'][i][0]}ms, v = {ch['points'][i][1]}") 
         else:
             console.print(f'ERROR: {id} is not a gdat channel', style='red')
 

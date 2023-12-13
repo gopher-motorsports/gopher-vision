@@ -3,7 +3,7 @@
 _Just want the GUI?_ Vist [Releases](https://github.com/gopher-motorsports/gopher-vision/releases) to download the latest `GopherVision.exe` under "Assets".
 
 ## Installation
-1. Install [Python 3.12](https://www.python.org/downloads/release/python-3120/)
+1. Install [Python 3.8.10](https://www.python.org/downloads/) or newer
 2. Install [Pipenv](https://pipenv.pypa.io/en/latest/):
 ```
 pip install --user pipenv

@@ -62,7 +62,7 @@ def parse(bytes, parameters):
     start = time.time()
     n_errors = 0
     # split byte string by start delimiter
-    packets = bytes.split(START.to_bytes())
+    packets = bytes.split(START.to_bytes(1, 'big'))
     for packet in packets:
         # unescape packet
         pkt = bytearray()
@@ -85,7 +85,7 @@ def parse(bytes, parameters):
         # validate checksum
         sum = START
         for b in pkt[:-1]: sum += b
-        if sum.to_bytes(2)[-1] != pkt[-1]:
+        if sum.to_bytes(2, 'big')[-1] != pkt[-1]:
             n_errors += 1
             continue
         # at this point, packet is valid, add to channel
@@ -98,7 +98,7 @@ def parse(bytes, parameters):
     for id in list(channels.keys()):
         channels[id]['n_points'] = len(channels[id]['points'])
         if channels[id]['n_points'] == 0:
-            print(f'removing empty channel: {channels[id]['name']} ({id})')
+            print(f"removing empty channel: {channels[id]['name']} ({id})")
             del channels[id]
 
     print('sorting data... ', end='', flush=True)
@@ -192,7 +192,7 @@ def parse(bytes, parameters):
             scalar, divisor = Fraction(scale).limit_denominator(0x7FF).as_integer_ratio()
             if scalar > 0x7FF:
                 # encoding failed, remove channel
-                print(f'WARNING: failed to encode channel: {ch['name']} ({id}) abs_max={abs_max}')
+                print(f"WARNING: failed to encode channel: {ch['name']} ({id}) abs_max={abs_max}")
                 del channels[id]
                 continue
             
