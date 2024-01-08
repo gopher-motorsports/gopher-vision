@@ -4,30 +4,25 @@ _Just want the GUI?_ Vist [Releases](https://github.com/gopher-motorsports/gophe
 
 ## Installation
 1. Install [Python 3.8.10](https://www.python.org/downloads/) or newer
-2. Install [Pipenv](https://pipenv.pypa.io/en/latest/):
-```
-pip install --user pipenv
-```
-3. Clone the project and install dependencies:
+2. Clone the project and install dependencies:
 ```
 git clone https://github.com/gopher-motorsports/gopher-vision.git
 cd gopher-vision
-pipenv install
+pip install -r requirements.txt
 ```
+
+*Optionally*, you might want to create a virtual environment for dependencies using [venv](https://docs.python.org/3/library/venv.html).
 
 ## Usage
 ### GUI
 **Option 1:** [Download](https://github.com/gopher-motorsports/gopher-vision/releases) and run `GopherVision.exe`
 
-**Option 2:** Run the script:
-```
-$ pipenv run python gui.py
-```
+**Option 2:** `python gui.py`
 
 ### CLI
 Start the GopherVision console:
 ```console
-$ pipenv run python cli.py
+$ python cli.py
 
 Welcome to GopherVision. Enter ? to list commands.
 
@@ -35,7 +30,7 @@ Welcome to GopherVision. Enter ? to list commands.
 
 Documented commands (type help <topic>):
 ========================================
-convert  exit  help  info  load  plot
+convert  exit  help  info  load  plot  query
 
 
 (GopherVision)
@@ -89,11 +84,11 @@ Exit the console:
 (GopherVision) exit
 ```
 
-Use `?` and `help` to learn how to use all of the commands.
+Use `?` and `help` for information on available commands.
 
 ## Contributing
 
 Build `GopherVision.exe`:
 ```
-pipenv run pyinstaller gui.py --onefile --distpath ./ --name GopherVision
+pyinstaller gui.py --onefile --distpath ./ --name GopherVision
 ```
