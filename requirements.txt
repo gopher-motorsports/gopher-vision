@@ -4,3 +4,4 @@ matplotlib
 rich
 dearpygui
 pyinstaller
+pyserial

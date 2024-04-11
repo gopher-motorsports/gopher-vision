@@ -1,6 +1,10 @@
 **GopherVision** is a collection of Python utilities for interacting with Gopher Motorsports data.
 
-_Just want the GUI?_ Vist [Releases](https://github.com/gopher-motorsports/gopher-vision/releases) to download the latest `GopherVision.exe` under "Assets".
+## Quickstart
+
+_Just want the GUI?_ Vist the [Releases](https://github.com/gopher-motorsports/gopher-vision/releases) page to download the latest version of the desktop app. You can find `GopherVision.exe` under the "Assets" dropdown.
+
+![](https://private-user-images.githubusercontent.com/69396515/287429527-bf7b86d8-db46-4286-b7c2-0f86df608253.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTI4NzM4NDAsIm5iZiI6MTcxMjg3MzU0MCwicGF0aCI6Ii82OTM5NjUxNS8yODc0Mjk1MjctYmY3Yjg2ZDgtZGI0Ni00Mjg2LWI3YzItMGY4NmRmNjA4MjUzLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA0MTElMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNDExVDIyMTIyMFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTQ1YTk0YWE2ZTVlMTlhOTRiYjdlNDY2MDZmYmZkOTQwMWM0NjFjNGNmMGUxYTkwYTRhZjc4MWE2NDMxMjBlZGEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.5_NtaI5UQ1h94K1ngdF5beuQ2rhNf5P5YXO9IgzcOxs)
 
 ## Installation
 1. Install [Python 3.8.10](https://www.python.org/downloads/) or newer
