@@ -4,7 +4,9 @@
 
 _Just want the GUI?_ Vist the [Releases](https://github.com/gopher-motorsports/gopher-vision/releases) page to download the latest version of the desktop app. You can find `GopherVision.exe` under the "Assets" dropdown.
 
+![](img/gcan.png)
 ![](img/parser.png)
+![](img/telemetry.png)
 
 ## Installation
 
@@ -130,5 +132,5 @@ python live-plot.py [PORT] [CONFIG_NAME]
 
 Build `GopherVision.exe`:
 ```
-pyinstaller gui.py --onefile --distpath ./ --name GopherVision
+pyinstaller gui.py --onefile --distpath ./ --name GopherVision_vX.X
 ```
