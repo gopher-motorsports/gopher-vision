@@ -4,9 +4,10 @@
 
 _Just want the GUI?_ Vist the [Releases](https://github.com/gopher-motorsports/gopher-vision/releases) page to download the latest version of the desktop app. You can find `GopherVision.exe` under the "Assets" dropdown.
 
-![](https://private-user-images.githubusercontent.com/69396515/287429527-bf7b86d8-db46-4286-b7c2-0f86df608253.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTI4NzM4NDAsIm5iZiI6MTcxMjg3MzU0MCwicGF0aCI6Ii82OTM5NjUxNS8yODc0Mjk1MjctYmY3Yjg2ZDgtZGI0Ni00Mjg2LWI3YzItMGY4NmRmNjA4MjUzLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA0MTElMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNDExVDIyMTIyMFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTQ1YTk0YWE2ZTVlMTlhOTRiYjdlNDY2MDZmYmZkOTQwMWM0NjFjNGNmMGUxYTkwYTRhZjc4MWE2NDMxMjBlZGEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.5_NtaI5UQ1h94K1ngdF5beuQ2rhNf5P5YXO9IgzcOxs)
+![](img/parser.png)
 
 ## Installation
+
 1. Install [Python 3.8.10](https://www.python.org/downloads/) or newer
 2. Clone the project and install dependencies:
 ```
@@ -15,15 +16,14 @@ cd gopher-vision
 pip install -r requirements.txt
 ```
 
-*Optionally*, you might want to create a virtual environment for dependencies using [venv](https://docs.python.org/3/library/venv.html).
+## GUI
 
-## Usage
-### GUI
 **Option 1:** [Download](https://github.com/gopher-motorsports/gopher-vision/releases) and run `GopherVision.exe`
 
 **Option 2:** `python gui.py`
 
-### CLI
+## CLI
+
 Start the GopherVision console:
 ```console
 $ python cli.py
@@ -89,6 +89,42 @@ Exit the console:
 ```
 
 Use `?` and `help` for information on available commands.
+
+## Utilities
+
+The `util/` folder contains some helpful standalone scripts for things like filtering .gdat files, simulating data, and basic live plotting.
+
+### `filter.py`
+
+This script copies packets with the specified IDs from an existing .gdat file to a new one.
+```
+python filter.py [INPUT].gdat [OUTPUT].gdat [IDs]
+e.g. python filter.py data.gdat enginerpm.gdat 1
+```
+
+### `tx.py`
+
+Generates random packets and sends them to a serial or network port.
+```
+python tx.py [PORT] [CONFIG_NAME]
+e.g. python tx.py COM4 go4-24c.yaml
+e.g. python tx.py /dev/tty.usbserial-X go4-24c.yaml
+e.g. python tx.py 5000 go4-24c.yaml
+```
+
+### `rx.py`
+
+Receives and parses .gdat packets from the specified serial or network port.
+```
+python rx.py [PORT] [CONFIG_NAME]
+```
+
+### `live-plot.py`
+
+Receives, parses, and plots .gdat packets from the specified serial or network port.
+```
+python live-plot.py [PORT] [CONFIG_NAME]
+```
 
 ## Contributing
 
