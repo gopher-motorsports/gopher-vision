@@ -38,6 +38,7 @@ PORT_TYPE = ''
 try:
     # attempt to open a network socket on localhost
     port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP socket
+    int(PORT) # checks that the supplied port is an integer
     PORT_TYPE = 'socket'
 except:
     try:
