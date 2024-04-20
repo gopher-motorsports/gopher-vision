@@ -55,17 +55,3 @@ def load_url(url: str):
         config = yaml.safe_load(f)
     print(f'loaded GopherCAN config: {url}')
     return config
-
-# load a GopherCAN config by a name like "go4-23c.yaml"
-def load(name: str):
-    path = Path('../gophercan-lib/network_autogen/configs/') / name
-    url = f'https://raw.githubusercontent.com/gopher-motorsports/gophercan-lib/master23/network_autogen/configs/{name}'
-    try:
-        config = load_path(path)
-    except:
-        print(f'WARNING: no config found at "{path}", checking GitHub...')
-        try:
-            config = load_url(url)
-        except:
-            raise Exception(f'ERROR: failed to load "{name}"')
-    return get_params(config)

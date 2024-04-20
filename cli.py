@@ -244,7 +244,11 @@ class Shell(cmd.Cmd):
             print(f'{name} has already been loaded')
             return
         
-        self.config_params = gcan.load(name)
+        try:
+            config_path = Path('../gophercan-lib/network_autogen/configs/') / name
+            self.config_params = gcan.load_path(config_path)
+        except:
+            raise Exception(f'ERROR: failed to load "{config_path}"')
         self.config_name = name
 
         if len(self.config_params) == 0:
