@@ -8,6 +8,7 @@ import time
 import threading
 import socket
 import serial
+import serial.tools.list_ports
 
 from lib import gcan
 from lib import gdat
@@ -33,32 +34,63 @@ parameters = {}
 channels = {}
 port = None
 
-def update_port(sender, app_data):
+def clear_port():
     global port
-    port_input = dpg.get_value('port_input')
+    if port is not None:
+        port.close()
+        port = None
+    dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
+
+def set_port_type(sender, port_type):
+    global port
+    clear_port()
+    # display options for port selection
+    if port_type == 'Serial':
+        dpg.configure_item('port_serial', show=True)
+        dpg.configure_item('port_socket', show=False)
+        dpg.configure_item('port_socket_set', show=False)
+        ports = serial.tools.list_ports.comports()
+        dpg.configure_item('port_serial', items=[p.device for p in ports])
+    elif port_type == 'Socket':
+        dpg.configure_item('port_serial', show=False)
+        dpg.configure_item('port_socket', show=True)
+        dpg.configure_item('port_socket_set', show=True)
+
+def set_port_serial(sender, port_name):
+    global port
     try:
-        # attempt to open a network socket on localhost
-        port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP socket
-        port.bind(('127.0.0.1', int(port_input)))
+        dpg.configure_item('port_status', default_value=f'opening {port_name} ...', color=COLORS['gray'])
+        port = serial.Serial(port_name, BAUD, timeout=TIMEOUT)
+        dpg.configure_item('port_status', default_value=f'{port_name} open', color=COLORS['green'])
+        print(f'port set: {port_name}')
     except:
-        try:
-            # attempt to open a serial port
-            port = serial.Serial(port_input, BAUD, timeout=TIMEOUT)
-        except:
-            print(f'ERROR: unrecognized port "{port_input}"')
-            dpg.configure_item('port_invalid', show=True)
-            return
-    dpg.configure_item('port_invalid', show=False)
-    print(f'port set: {port_input} type={type(port)}')
+        print(f'ERROR: failed to open serial port "{port_name}"')
+        clear_port()
+
+def set_port_socket(sender, _):
+    global port
+    port_num = dpg.get_value('port_socket')
+    try:
+        dpg.configure_item('port_status', default_value=f'opening 127.0.0.1:{port_num} ...', color=COLORS['gray'])
+        port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP socket
+        port.bind(('127.0.0.1', int(port_num)))
+        dpg.configure_item('port_status', default_value=f'127.0.0.1:{port_num} open', color=COLORS['green'])
+        print(f'port set: 127.0.0.1:{port_num}')
+    except:
+        print(f'ERROR: failed to open socket on port "{port_num}"')
+        clear_port()
 
 def rx():
     global port
     while True:
-        if type(port) == socket.socket:
-            bytes = port.recv(BLOCK_SIZE)
-        elif type(port) == serial.Serial:
-            bytes = port.read(BLOCK_SIZE)
-        else:
+        try:
+            if type(port) == socket.socket:
+                bytes = port.recv(BLOCK_SIZE)
+            elif type(port) == serial.Serial:
+                bytes = port.read(BLOCK_SIZE)
+            else:
+                raise Exception()
+        except:
             time.sleep(1)
             continue
 
@@ -225,9 +257,14 @@ with dpg.window(tag='window'):
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
             with dpg.group(horizontal=True):
                 dpg.add_text('Port:')
-                dpg.add_input_text(tag='port_input', width=150)
-                dpg.add_button(label='Set', callback=update_port)
-                dpg.add_text('INVALID PORT', tag='port_invalid', color=COLORS['red'], show=False)
+                dpg.add_combo(items=['Serial', 'Socket'], callback=set_port_type, width=100)
+                # dropdown for port selection when 'Serial' is selected
+                dpg.add_combo(tag='port_serial', items=[], callback=set_port_serial, width=100, show=False)
+                # text box and button for network port number when 'Socket' is selected
+                dpg.add_input_text(tag='port_socket', hint='e.g. 5000', width=100, show=False)
+                dpg.add_button(tag='port_socket_set', label='Set', callback=set_port_socket, show=False)
+                # displays port status
+                dpg.add_text('No port open', tag='port_status', color=COLORS['red'])
             dpg.add_button(tag='add_btn', label='Add Parameter +')
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
