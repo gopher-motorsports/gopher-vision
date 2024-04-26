@@ -77,7 +77,7 @@ print(f'listening on port "{PORT}"...')
 
 new_data = 1
 id_sender = 1
-
+replaceFlag = 0
 def update_data(): # threaded to constantly update data
     sample = 1
     t0 = time.time()
@@ -192,6 +192,10 @@ def item_list_callback(sender):
 # replace function for each graph
 def replace(sender, app_data, user_data):
     ID = idDict[name]
+    # for value in windowID_dict.values(): ATTEMPT AT FIXING DUPES
+    #     if (ID == value):
+    #         print("Error: item in graph")
+    #         return
     global id_sender
     id_sender = user_data[0]
     dpg.delete_item(f'{windowID_dict[id_sender]}_window')
