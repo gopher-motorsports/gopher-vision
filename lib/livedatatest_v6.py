@@ -217,25 +217,43 @@ def search_bar_callback(sender, filter_string):
     dpg.set_value("filter_id", filter_string)
     dpg.set_value(item_list, filter_string)
 
+
+
 # preset code starting here
+
+def presetReplace(presetName, presetUnit, user_data):
+    ID = idDict[presetName]
+    global id_sender
+    id_sender = user_data[0]
+    dpg.delete_item(f'{windowID_dict[id_sender]}_window')
+    x = user_data[1]
+    y = user_data[2]
+    windowID_dict[id_sender] = ID
+    create_plot(windowID_dict[id_sender], presetName, x, y, presetName, presetUnit)
+    dpg.hide_item("replace_data_window")
     
 def newPreset_callback(sender, app_data, preset_key):
     # using the parameter key to change the 5 windows
     # change window 1
-    dpg.set_item_label('1_plot', store_presets_dict[preset_key][0])
-    dpg.set_item_label('1_y', unitDict[store_presets_dict[preset_key][0]])
+    # dpg.set_item_label(f'{windowID_dict[1]}_plot', store_presets_dict[preset_key][0])
+    # dpg.set_item_label(f'{windowID_dict[1]}_y', unitDict[store_presets_dict[preset_key][0]])
+    presetReplace(store_presets_dict[preset_key][0], unitDict[store_presets_dict[preset_key][0]], [1,300,0])
     # change window 2
-    dpg.set_item_label('2_plot', store_presets_dict[preset_key][1])
-    dpg.set_item_label('2_y', unitDict[store_presets_dict[preset_key][1]])
+    # dpg.set_item_label(f'{windowID_dict[2]}_plot', store_presets_dict[preset_key][1])
+    # dpg.set_item_label(f'{windowID_dict[2]}y', unitDict[store_presets_dict[preset_key][1]])
+    presetReplace(store_presets_dict[preset_key][1], unitDict[store_presets_dict[preset_key][1]], [2,300,200])
     # change window 3
-    dpg.set_item_label('3_plot', store_presets_dict[preset_key][2])
-    dpg.set_item_label('3_y', unitDict[store_presets_dict[preset_key][2]])
+    # dpg.set_item_label(f'{windowID_dict[3]}_plot', store_presets_dict[preset_key][2])
+    # dpg.set_item_label(f'{windowID_dict[3]}_y', unitDict[store_presets_dict[preset_key][2]])
+    presetReplace(store_presets_dict[preset_key][2], unitDict[store_presets_dict[preset_key][2]], [3,300,400])
     # change window 4
-    dpg.set_item_label('4_plot', store_presets_dict[preset_key][3])
-    dpg.set_item_label('4_y', unitDict[store_presets_dict[preset_key][3]])
+    # dpg.set_item_label(f'{windowID_dict[4]}_plot', store_presets_dict[preset_key][3])
+    # dpg.set_item_label(f'{windowID_dict[4]}y', unitDict[store_presets_dict[preset_key][3]])
+    presetReplace(store_presets_dict[preset_key][3], unitDict[store_presets_dict[preset_key][3]], [4,300,600])
     # change window 5
-    dpg.set_item_label('5_plot', store_presets_dict[preset_key][4])
-    dpg.set_item_label('5_y', unitDict[store_presets_dict[preset_key][4]])
+    # dpg.set_item_label(f'{windowID_dict[5]}_plot', store_presets_dict[preset_key][4])
+    # dpg.set_item_label(f'{windowID_dict[5]}y', unitDict[store_presets_dict[preset_key][4]])
+    presetReplace(store_presets_dict[preset_key][4], unitDict[store_presets_dict[preset_key][4]], [5,300,800])
 
 # dictionary for storing presets
 # key: name of the button for the preset
@@ -245,11 +263,11 @@ store_presets_dict = {}
 # callback function for creating a new preset
 def set_new_preset_name_callback (sender):
     # get current 5 window datas and store them in a list
-    window1_label = dpg.get_item_label('1_plot')
-    window2_label = dpg.get_item_label('2_plot')
-    window3_label = dpg.get_item_label('3_plot')
-    window4_label = dpg.get_item_label('4_plot')
-    window5_label = dpg.get_item_label('5_plot')
+    window1_label = dpg.get_item_label(f'{windowID_dict[1]}_plot')
+    window2_label = dpg.get_item_label(f'{windowID_dict[2]}_plot')
+    window3_label = dpg.get_item_label(f'{windowID_dict[3]}_plot')
+    window4_label = dpg.get_item_label(f'{windowID_dict[4]}_plot')
+    window5_label = dpg.get_item_label(f'{windowID_dict[5]}_plot')
     newPreset = [window1_label, window2_label, window3_label, window4_label, window5_label]
 
     # take in user input for name of new preset button
