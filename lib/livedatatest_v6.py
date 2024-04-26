@@ -7,13 +7,15 @@ import gdat
 from pathlib import Path
 import serial
 import struct
+import sys
+import socket
 
 nsamples = 100
 
 global y
 
 # reads in and converts ic yaml parameters
-icParameters = gcan.get_params(gcan.load_path("../../gophercan-lib/network_autogen/configs/go4-23c.yaml"))
+icParameters = gcan.get_params(gcan.load_path("go4-23c.yaml"))
 
 # data dictionary
 plot_data = {
@@ -24,20 +26,54 @@ plot_data = {
 }
 
 # id dictionary
-windowID_dict = {1: 1, 2: 1, 3: 1, 4: 1, 5: 1}
+windowID_dict = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
 
 # reads data from usb
+sys.path.append('../')
+from lib import gcan
+sys.path.pop()
+if len(sys.argv) != 3:
+    print('invalid arguments, expected "python livedatatest_v6.py [PORT] [CONFIG_NAME]"')
+    exit()
+
 START = 0x7E
 ESC = 0x7D
 ESC_XOR = 0x20
 
-PORT = 'COM4'
+PORT = sys.argv[1]
 BAUD = 230400
+
+CONFIG_NAME = sys.argv[2]
 
 BLOCK_SIZE = 1000 # bytes to read in each update
 TIMEOUT = 1 # seconds to wait for desired block size
 
-port = serial.Serial(PORT, BAUD, timeout=TIMEOUT)
+PORT_TYPE = ''
+try:
+    # attempt to open a network socket on localhost
+    port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP socket
+    port.bind(('127.0.0.1', int(PORT)))
+    PORT_TYPE = 'socket'
+except:
+    try:
+        # attempt to open a serial port
+        port = serial.Serial(PORT, BAUD, timeout=TIMEOUT)
+        PORT_TYPE = 'serial'
+    except:
+        print(f'ERROR: unrecognized port "{PORT}"')
+        exit()
+
+try:
+    config_path = Path('../../gopher-vision/lib') / CONFIG_NAME
+    config = gcan.load_path(config_path)
+except:
+    print(f'ERROR: no config found at "{config_path}"')
+    exit()
+
+parameters = gcan.get_params(config)
+pids = list(parameters.keys())
+
+print(f'listening on port "{PORT}"...')
 
 new_data = 1
 id_sender = 1
@@ -46,10 +82,11 @@ def update_data(): # threaded to constantly update data
     sample = 1
     t0 = time.time()
     while True:
-        # recieving data   
-        bytes = port.read(BLOCK_SIZE)
-        # print(bytes.hex(' '))
-        # continue
+        if PORT_TYPE == 'serial':
+            bytes = port.read(BLOCK_SIZE)
+        elif PORT_TYPE == 'socket':
+            bytes = port.recv(BLOCK_SIZE)
+
         packets = bytes.split(START.to_bytes(1, 'big'))
         for packet in packets:
             # unescape packet
@@ -66,13 +103,15 @@ def update_data(): # threaded to constantly update data
             # unpack components
             try:
                 ts, id = struct.unpack('>IH', pkt[0:6])
-                value = struct.unpack(icParameters[id]['format'], pkt[6:-1])[0]
+                value = struct.unpack(parameters[id]['format'], pkt[6:-1])[0]
             except:
+                # print(f'failed to decode: {packet}')
                 continue
             # validate checksum
             sum = START
             for b in pkt[:-1]: sum += b
             if sum.to_bytes(2, 'big')[-1] != pkt[-1]:
+                # print(f'invalid checksum: {packet}')
                 continue
             
             if id in plot_data:
