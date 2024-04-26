@@ -3,26 +3,15 @@ from tkinter import filedialog
 import tkinter as tk
 from pathlib import Path
 from collections import deque
-import struct
 import time
 import threading
-import socket
 import serial
 import serial.tools.list_ports
 
 from lib import gcan
 from lib import gdat
 from lib import ld
-
-START = 0x7E
-ESC = 0x7D
-ESC_XOR = 0x20
-
-BAUD = 230400
-BLOCK_SIZE = 1000 # bytes to read in each update
-TIMEOUT = 1 # seconds to wait for desired block size
-
-PLOT_SIZE = 100
+from lib import live
 
 COLORS = {
     'red': (231, 76, 60),
@@ -30,106 +19,17 @@ COLORS = {
     'gray': (255, 255, 255, 128)
 }
 
+PLOT_SIZE = 500
+PLOT_REFRESH_HZ = 100
+
+receiver = live.Receiver()
 parameters = {}
-channels = {}
-port = None
-
-def clear_port():
-    global port
-    if port is not None:
-        port.close()
-        port = None
-    dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
-
-def set_port_type(sender, port_type):
-    global port
-    clear_port()
-    # display options for port selection
-    if port_type == 'Serial':
-        dpg.configure_item('port_serial', show=True)
-        dpg.configure_item('port_socket', show=False)
-        dpg.configure_item('port_socket_set', show=False)
-        ports = serial.tools.list_ports.comports()
-        dpg.configure_item('port_serial', items=[p.device for p in ports])
-    elif port_type == 'Socket':
-        dpg.configure_item('port_serial', show=False)
-        dpg.configure_item('port_socket', show=True)
-        dpg.configure_item('port_socket_set', show=True)
-
-def set_port_serial(sender, port_name):
-    global port
-    try:
-        dpg.configure_item('port_status', default_value=f'opening {port_name} ...', color=COLORS['gray'])
-        port = serial.Serial(port_name, BAUD, timeout=TIMEOUT)
-        dpg.configure_item('port_status', default_value=f'{port_name} open', color=COLORS['green'])
-        print(f'port set: {port_name}')
-    except:
-        print(f'ERROR: failed to open serial port "{port_name}"')
-        clear_port()
-
-def set_port_socket(sender, _):
-    global port
-    port_num = dpg.get_value('port_socket')
-    try:
-        dpg.configure_item('port_status', default_value=f'opening 127.0.0.1:{port_num} ...', color=COLORS['gray'])
-        port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP socket
-        port.bind(('127.0.0.1', int(port_num)))
-        dpg.configure_item('port_status', default_value=f'127.0.0.1:{port_num} open', color=COLORS['green'])
-        print(f'port set: 127.0.0.1:{port_num}')
-    except:
-        print(f'ERROR: failed to open socket on port "{port_num}"')
-        clear_port()
-
-def rx():
-    global port
-    while True:
-        try:
-            if type(port) == socket.socket:
-                bytes = port.recv(BLOCK_SIZE)
-            elif type(port) == serial.Serial:
-                bytes = port.read(BLOCK_SIZE)
-            else:
-                raise Exception()
-        except:
-            time.sleep(1)
-            continue
-
-        packets = bytes.split(START.to_bytes(1, 'big'))
-        for packet in packets:
-            # unescape packet
-            pkt = bytearray()
-            esc = False
-            for b in packet:
-                if b == ESC:
-                    esc = True
-                elif esc:
-                    pkt.append(b ^ ESC_XOR)
-                    esc = False
-                else:
-                    pkt.append(b)
-            # unpack components
-            try:
-                ts, id = struct.unpack('>IH', pkt[0:6])
-                value = struct.unpack(parameters[id]['format'], pkt[6:-1])[0]
-            except:
-                # print(f'failed to decode: {packet}')
-                continue
-            # validate checksum
-            sum = START
-            for b in pkt[:-1]: sum += b
-            if sum.to_bytes(2, 'big')[-1] != pkt[-1]:
-                # print(f'invalid checksum: {packet}')
-                continue
-            # add datapoint to channel
-            try:
-                channels[id]['x'].append(ts)
-                channels[id]['y'].append(value)
-            except:
-                continue
+plot_data = {}
 
 def load_config(sender):
+    global receiver
     global parameters
-    global channels
+    global plot_data
 
     root = tk.Tk()
     root.withdraw()
@@ -143,7 +43,8 @@ def load_config(sender):
         return
     
     parameters = gcan.get_params(gcan.load_path(path))
-    channels = {
+    receiver.set_parameters(parameters)
+    plot_data = {
         id: {
             'x': deque([0], maxlen=PLOT_SIZE),
             'y': deque([0], maxlen=PLOT_SIZE)
@@ -230,11 +131,58 @@ def add_plot(sender, app_data, pid):
         with dpg.plot(width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
-            dpg.add_line_series(list(channels[pid]['x']), list(channels[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
+            dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
+
+# transfer values from receiver to plots at fixed rate
+def update_plots():
+    while True:
+        t = time.time()
+        for (id, value) in receiver.values.items():
+            # update plot data
+            plot_data[id]['x'].append(t)
+            plot_data[id]['y'].append(value)
+            # if plot is visible, update series
+            if dpg.does_item_exist(f'{id}_series'):
+                dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
+                dpg.set_item_label(f'{id}_value', round(plot_data[id]['y'][-1], 3))
+                dpg.fit_axis_data(f'{id}_x')
+                dpg.fit_axis_data(f'{id}_y')
+        time.sleep(1 / PLOT_REFRESH_HZ)
+
+def set_port_type(sender, port_type):
+    # display options for port selection
+    if port_type == 'Serial':
+        dpg.configure_item('port_serial', show=True)
+        dpg.configure_item('port_socket', show=False)
+        dpg.configure_item('port_socket_set', show=False)
+        ports = serial.tools.list_ports.comports()
+        dpg.configure_item('port_serial', items=[p.device for p in ports])
+    elif port_type == 'Socket':
+        dpg.configure_item('port_serial', show=False)
+        dpg.configure_item('port_socket', show=True)
+        dpg.configure_item('port_socket_set', show=True)
+
+def set_port_serial(sender, port_name):
+    try:
+        dpg.configure_item('port_status', default_value=f'opening {port_name} ...', color=COLORS['gray'])
+        receiver.open_serial_port(port_name)
+        dpg.configure_item('port_status', default_value=f'{port_name} open', color=COLORS['green'])
+    except:
+        dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
+
+def set_port_socket(sender, _):
+    port_num = dpg.get_value('port_socket')
+    try:
+        dpg.configure_item('port_status', default_value=f'opening 127.0.0.1:{port_num} ...', color=COLORS['gray'])
+        receiver.open_socket(port_num)
+        dpg.configure_item('port_status', default_value=f'127.0.0.1:{port_num} open', color=COLORS['green'])
+    except:
+        dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
 dpg.create_context()
 dpg.create_viewport(title='GopherVision', width=800, height=600)
+dpg.set_viewport_vsync(True)
 
 with dpg.window(tag='window'):
     dpg.set_primary_window('window', True)
@@ -273,17 +221,7 @@ with dpg.window(tag='window'):
 
 dpg.setup_dearpygui()
 dpg.show_viewport()
-
-# start data receiving thread
-threading.Thread(target=rx, daemon=True).start()
-
-while dpg.is_dearpygui_running():
-    for (id, channel) in channels.items():
-        if dpg.does_item_exist(f'{id}_series'):
-            dpg.set_value(f'{id}_series', [list(channel['x']), list(channel['y'])])
-            dpg.set_item_label(f'{id}_value', round(channel['y'][-1], 3))
-            dpg.fit_axis_data(f'{id}_x')
-            dpg.fit_axis_data(f'{id}_y')
-    dpg.render_dearpygui_frame()
-
+receiver.start()
+threading.Thread(target=update_plots, daemon=True).start()
+dpg.start_dearpygui()
 dpg.destroy_context()
