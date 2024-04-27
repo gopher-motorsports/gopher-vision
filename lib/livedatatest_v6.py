@@ -26,7 +26,7 @@ plot_data = {
 }
 
 # id dictionary
-windowID_dict = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
+windowID_dict = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 
 # reads data from usb
 sys.path.append('../')
@@ -77,7 +77,6 @@ print(f'listening on port "{PORT}"...')
 
 new_data = 1
 id_sender = 1
-replaceFlag = 0
 def update_data(): # threaded to constantly update data
     sample = 1
     t0 = time.time()
@@ -142,11 +141,11 @@ def create_plot(id, name, pos_x, pos_y, label, y_axis): # creates plot on window
             
     dpg.set_item_pos(f'{id}_window', (pos_x, pos_y)) # moves window
 
-create_plot(1, 'Data Window 1', 300, 0, 'Live Data', 'y')
-create_plot(2, 'Data Window 2', 300, 200, 'Live Data', 'y')
-create_plot(3, 'Data Window 3', 300, 400, 'Live Data', 'y')
-create_plot(4, 'Data Window 4', 300, 600, 'Live Data', 'y')
-create_plot(5, 'Data Window 5', 300, 800, 'Live Data', 'y')
+# create_plot(1, 'Data Window 1', 300, 0, 'Live Data', 'y')
+# create_plot(2, 'Data Window 2', 300, 200, 'Live Data', 'y')
+# create_plot(3, 'Data Window 3', 300, 400, 'Live Data', 'y')
+# create_plot(4, 'Data Window 4', 300, 600, 'Live Data', 'y')
+# create_plot(5, 'Data Window 5', 300, 800, 'Live Data', 'y')
 
 # plot themes
 with dpg.theme(tag="plot_theme"):
@@ -165,11 +164,11 @@ with dpg.theme(tag="plot_theme4"):
     with dpg.theme_component(dpg.mvLineSeries):
         dpg.add_theme_color(dpg.mvPlotCol_Line, (75, 100, 255), category=dpg.mvThemeCat_Plots)
 
-dpg.bind_item_theme("1_series", "plot_theme")
-dpg.bind_item_theme("2_series", "plot_theme2")
-dpg.bind_item_theme("3_series", "plot_theme3")
-dpg.bind_item_theme("4_series", "plot_theme4")
-dpg.bind_item_theme("5_series", "plot_theme4")
+# dpg.bind_item_theme("1_series", "plot_theme")
+# dpg.bind_item_theme("2_series", "plot_theme2")
+# dpg.bind_item_theme("3_series", "plot_theme3")
+# dpg.bind_item_theme("4_series", "plot_theme4")
+# dpg.bind_item_theme("5_series", "plot_theme4")
 
 # create item list and dictionaries for parameters
 item_list = []
@@ -188,17 +187,22 @@ def item_list_callback(sender):
     global unit
     name = dpg.get_item_label(sender)
     unit = unitDict[name]
-
+start = 1
 # replace function for each graph
 def replace(sender, app_data, user_data):
     ID = idDict[name]
-    # for value in windowID_dict.values(): ATTEMPT AT FIXING DUPES
-    #     if (ID == value):
-    #         print("Error: item in graph")
-    #         return
+    global start
     global id_sender
     id_sender = user_data[0]
-    dpg.delete_item(f'{windowID_dict[id_sender]}_window')
+    for value in windowID_dict.values():
+            if (ID == value):
+                print("Error: item in graph")
+                dpg.hide_item("replace_data_window")
+                return
+    if (start >= 5):
+        dpg.delete_item(f'{windowID_dict[id_sender]}_window')
+    else:
+        start += 1
     x = user_data[1]
     y = user_data[2]
     windowID_dict[id_sender] = ID
@@ -227,9 +231,16 @@ def search_bar_callback(sender, filter_string):
 
 def presetReplace(presetName, presetUnit, user_data):
     ID = idDict[presetName]
+    global start
     global id_sender
     id_sender = user_data[0]
-    dpg.delete_item(f'{windowID_dict[id_sender]}_window')
+    for value in windowID_dict.values():
+            if (ID == value):
+                print("Error: item in graph")
+                dpg.hide_item("replace_data_window")
+                return
+    if (start >= 5):
+        dpg.delete_item(f'{windowID_dict[id_sender]}_window')
     x = user_data[1]
     y = user_data[2]
     windowID_dict[id_sender] = ID
