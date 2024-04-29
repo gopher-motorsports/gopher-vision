@@ -26,11 +26,14 @@ receiver = live.Receiver()
 parameters = {}
 plot_data = {}
 
+# callback for "Browse" button in GopherCAN tab
+# opens a file dialog to load a YAML config
 def load_config(sender):
     global receiver
     global parameters
     global plot_data
 
+    # open file dialog
     root = tk.Tk()
     root.withdraw()
     path = filedialog.askopenfilename(
@@ -42,7 +45,12 @@ def load_config(sender):
     if not path:
         return
     
-    parameters = gcan.get_params(gcan.load_path(path))
+    # load GopherCAN parameters
+    try:
+        parameters = gcan.get_params(gcan.load_path(path))
+    except:
+        print(f'ERROR: failed to collect parameters from "{path}"')
+        return
     receiver.set_parameters(parameters)
     plot_data = {
         id: {
@@ -77,11 +85,14 @@ def load_config(sender):
     for parameter in parameters.values():
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
 
+# callback for "Convert" button in Data Parser tab
+# converts .gdat files to .ld
 def convert(sender):
     global parameters
     if len(parameters) == 0:
         return
 
+    # open file dialog to select 1+ .gdat files
     root = tk.Tk()
     root.withdraw()
     paths = filedialog.askopenfilename(
@@ -108,15 +119,16 @@ def convert(sender):
                 print(f'overwriting: {ld_path}')
                 ld_path.unlink()
             ld.write(ld_path, channels, t0)
-        except Exception as e:
+        except Exception as err:
             print(f'failed to convert: {path}')
-            print(e)
+            print(err)
         # update loading bar, add path to done list
         n += 1
         dpg.configure_item('convert_loading', default_value=(n / len(paths)), overlay=f'{n}/{len(paths)}')
         dpg.add_text(ld_path, parent='convert_done', color=COLORS['gray'])
-    dpg.configure_item('convert_loading', overlay='')
 
+# callback for "Add Parameter" button in Telemetry tab
+# creates a plot for a loaded GCAN parameter
 def add_plot(sender, app_data, pid):
     parameter = parameters[pid]
 
@@ -134,7 +146,8 @@ def add_plot(sender, app_data, pid):
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
-# transfer values from receiver to plots at fixed rate
+# transfer values from receiver to plots at a fixed rate
+# called as a background daemon thread
 def update_plots():
     while True:
         t = time.time()
@@ -150,8 +163,8 @@ def update_plots():
                 dpg.fit_axis_data(f'{id}_y')
         time.sleep(1 / PLOT_REFRESH_HZ)
 
+# display options for port selection
 def set_port_type(sender, port_type):
-    # display options for port selection
     if port_type == 'Serial':
         dpg.configure_item('port_serial', show=True)
         dpg.configure_item('port_socket', show=False)
@@ -163,6 +176,7 @@ def set_port_type(sender, port_type):
         dpg.configure_item('port_socket', show=True)
         dpg.configure_item('port_socket_set', show=True)
 
+# callback triggered when an item is selected in serial port dropdown
 def set_port_serial(sender, port_name):
     try:
         dpg.configure_item('port_status', default_value=f'opening {port_name} ...', color=COLORS['gray'])
@@ -171,6 +185,7 @@ def set_port_serial(sender, port_name):
     except:
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
+# callback for  "Set" button when entering a network port
 def set_port_socket(sender, _):
     port_num = dpg.get_value('port_socket')
     try:
