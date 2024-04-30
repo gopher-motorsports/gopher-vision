@@ -208,7 +208,6 @@ def add_client(sender, _):
     host = dpg.get_value('client_add_host')
     port = dpg.get_value('client_add_port')
     node.add_client(host, port)
-    dpg.configure_item('client_btn', label=f'{len(node.clients)} clients')
     dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
 
 def remove_client(sender, _):
@@ -216,7 +215,6 @@ def remove_client(sender, _):
     host = dpg.get_value('client_add_host')
     port = dpg.get_value('client_add_port')
     node.remove_client(host, port)
-    dpg.configure_item('client_btn', label=f'{len(node.clients)} clients')
     dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
 
 dpg.create_context()
@@ -242,35 +240,40 @@ with dpg.window(tag='window'):
                 dpg.add_text('Done:', color=COLORS['gray'])
 
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
-            # receive port selection
             with dpg.group(horizontal=True):
-                dpg.add_text('Port:')
-                dpg.add_combo(items=['Serial Port', 'Network Socket'], callback=set_port_type, width=150)
+                # button to open settings modal
+                dpg.add_button(tag='settings_btn', label='Settings')
+                # button to add parameter plots
+                dpg.add_button(tag='add_btn', label='Add Parameter +')
+                with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                    dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
+                    with dpg.filter_set(tag='parameter_list'):
+                        pass
+
+            with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                # receive port selection
+                with dpg.group(horizontal=True):
+                    dpg.add_text('Port:')
+                    dpg.add_combo(items=['Serial Port', 'Network Socket'], callback=set_port_type, width=150)
                 # dropdown for serial port selection - shown when 'Serial Port' is selected
                 dpg.add_combo(tag='port_serial', items=[], callback=set_port_serial, width=100, show=False)
                 # text boxes for network host and port - shown when 'Network Socket' is selected
-                dpg.add_input_text(tag='port_socket_host', hint='host', default_value='127.0.0.1', width=100, show=False)
-                dpg.add_input_text(tag='port_socket_port', hint='port', default_value='5000', width=100, show=False)
-                dpg.add_button(tag='port_socket_set', label='Set', callback=set_port_socket, show=False)
+                with dpg.group(horizontal=True):
+                    dpg.add_input_text(tag='port_socket_host', hint='host', default_value='127.0.0.1', width=100, show=False)
+                    dpg.add_input_text(tag='port_socket_port', hint='port', default_value='5000', width=100, show=False)
+                    dpg.add_button(tag='port_socket_set', label='Set', callback=set_port_socket, show=False)
                 # displays port status
                 dpg.add_text('No port open', tag='port_status', color=COLORS['red'])
-            # list of clients to forward data to
-            with dpg.group(horizontal=True):
-                dpg.add_text('Forward:')
-                dpg.add_button(tag='client_btn', label='0 clients')
-            with dpg.popup('client_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_separator()
+
+                # list of clients to forward data to
+                dpg.add_text('Forward data to:')
+                dpg.add_listbox(tag='client_list', items=[])
                 with dpg.group(horizontal=True):
                     dpg.add_input_text(tag='client_add_host', hint='host', width=100)
                     dpg.add_input_text(tag='client_add_port', hint='port', width=100)
                     dpg.add_button(label='Add', callback=add_client)
                     dpg.add_button(label='Remove', callback=remove_client)
-                dpg.add_listbox(tag='client_list', items=[])
-            # button to add parameter plots
-            dpg.add_button(tag='add_btn', label='Add Parameter +')
-            with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
-                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
-                with dpg.filter_set(tag='parameter_list'):
-                    pass
 
 dpg.setup_dearpygui()
 dpg.show_viewport()
