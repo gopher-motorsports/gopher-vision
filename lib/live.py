@@ -38,7 +38,7 @@ class Port:
         else:
             raise Exception('ERROR: socket not open')
 
-    def open_serial(self, name: str, baud: int, timeout: int):
+    def open_serial(self, name: str, baud: int = BAUD, timeout: int = TIMEOUT):
         try:
             self.port = serial.Serial(name, baud, timeout=timeout)
             print(f'opened port: {name}')

@@ -207,7 +207,8 @@ def set_port_serial(sender, port_name):
         dpg.configure_item('port_status', default_value=f'opening {port_name} ...', color=COLORS['gray'])
         node.rx_port.open_serial(port_name)
         dpg.configure_item('port_status', default_value=f'{port_name} open', color=COLORS['green'])
-    except:
+    except Exception as err:
+        print(err)
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
 # callback for  "Set" button when entering a network port
@@ -219,7 +220,8 @@ def set_port_socket(sender, _):
         dpg.configure_item('port_status', default_value=f'opening {host}:{port} ...', color=COLORS['gray'])
         node.rx_port.bind_socket(host, port)
         dpg.configure_item('port_status', default_value=f'{host}:{port} open', color=COLORS['green'])
-    except:
+    except Exception as err:
+        print(err)
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
 def add_client(sender, _):
