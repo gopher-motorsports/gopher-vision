@@ -22,14 +22,15 @@ COLORS = {
 PLOT_SIZE = 500
 PLOT_REFRESH_HZ = 100
 
-receiver = live.Receiver()
+node = live.Node()
+node.tx_port.open_socket()
 parameters = {}
 plot_data = {}
 
 # callback for "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
 def load_config(sender):
-    global receiver
+    global node
     global parameters
     global plot_data
 
@@ -51,7 +52,8 @@ def load_config(sender):
     except:
         print(f'ERROR: failed to collect parameters from "{path}"')
         return
-    receiver.set_parameters(parameters)
+    
+    node.set_parameters(parameters)
     plot_data = {
         id: {
             'x': deque([0], maxlen=PLOT_SIZE),
@@ -149,9 +151,10 @@ def add_plot(sender, app_data, pid):
 # transfer values from receiver to plots at a fixed rate
 # called as a background daemon thread
 def update_plots():
+    global node
     while True:
         t = time.time()
-        for (id, value) in receiver.values.items():
+        for (id, value) in node.values.items():
             # update plot data
             plot_data[id]['x'].append(t)
             plot_data[id]['y'].append(value)
@@ -165,33 +168,38 @@ def update_plots():
 
 # display options for port selection
 def set_port_type(sender, port_type):
-    if port_type == 'Serial':
+    if port_type == 'Serial Port':
         dpg.configure_item('port_serial', show=True)
-        dpg.configure_item('port_socket', show=False)
+        dpg.configure_item('port_socket_host', show=False)
+        dpg.configure_item('port_socket_port', show=False)
         dpg.configure_item('port_socket_set', show=False)
         ports = serial.tools.list_ports.comports()
         dpg.configure_item('port_serial', items=[p.device for p in ports])
-    elif port_type == 'Socket':
+    elif port_type == 'Network Socket':
         dpg.configure_item('port_serial', show=False)
-        dpg.configure_item('port_socket', show=True)
+        dpg.configure_item('port_socket_host', show=True)
+        dpg.configure_item('port_socket_port', show=True)
         dpg.configure_item('port_socket_set', show=True)
 
 # callback triggered when an item is selected in serial port dropdown
 def set_port_serial(sender, port_name):
+    global node
     try:
         dpg.configure_item('port_status', default_value=f'opening {port_name} ...', color=COLORS['gray'])
-        receiver.open_serial_port(port_name)
+        node.rx_port.open_serial(port_name)
         dpg.configure_item('port_status', default_value=f'{port_name} open', color=COLORS['green'])
     except:
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
 # callback for  "Set" button when entering a network port
 def set_port_socket(sender, _):
-    port_num = dpg.get_value('port_socket')
+    global node
+    host = dpg.get_value('port_socket_host')
+    port = dpg.get_value('port_socket_port')
     try:
-        dpg.configure_item('port_status', default_value=f'opening 127.0.0.1:{port_num} ...', color=COLORS['gray'])
-        receiver.open_socket(port_num)
-        dpg.configure_item('port_status', default_value=f'127.0.0.1:{port_num} open', color=COLORS['green'])
+        dpg.configure_item('port_status', default_value=f'opening {host}:{port} ...', color=COLORS['gray'])
+        node.rx_port.bind_socket(host, port)
+        dpg.configure_item('port_status', default_value=f'{host}:{port} open', color=COLORS['green'])
     except:
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
@@ -219,12 +227,13 @@ with dpg.window(tag='window'):
 
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
             with dpg.group(horizontal=True):
-                dpg.add_text('Port:')
-                dpg.add_combo(items=['Serial', 'Socket'], callback=set_port_type, width=100)
-                # dropdown for port selection when 'Serial' is selected
+                dpg.add_text('RX Port:')
+                dpg.add_combo(items=['Serial Port', 'Network Socket'], callback=set_port_type, width=150)
+                # dropdown for serial port selection - shown when 'Serial Port' is selected
                 dpg.add_combo(tag='port_serial', items=[], callback=set_port_serial, width=100, show=False)
-                # text box and button for network port number when 'Socket' is selected
-                dpg.add_input_text(tag='port_socket', hint='e.g. 5000', width=100, show=False)
+                # text boxes for network host and port - shown when 'Network Socket' is selected
+                dpg.add_input_text(tag='port_socket_host', hint='host', default_value='127.0.0.1', width=100, show=False)
+                dpg.add_input_text(tag='port_socket_port', hint='port', default_value='5000', width=100, show=False)
                 dpg.add_button(tag='port_socket_set', label='Set', callback=set_port_socket, show=False)
                 # displays port status
                 dpg.add_text('No port open', tag='port_status', color=COLORS['red'])
@@ -236,7 +245,6 @@ with dpg.window(tag='window'):
 
 dpg.setup_dearpygui()
 dpg.show_viewport()
-receiver.start()
 threading.Thread(target=update_plots, daemon=True).start()
 dpg.start_dearpygui()
 dpg.destroy_context()
