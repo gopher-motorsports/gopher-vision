@@ -19,11 +19,15 @@ COLORS = {
     'gray': (255, 255, 255, 128)
 }
 
-PLOT_SIZE = 500
-PLOT_REFRESH_HZ = 100
+PLOT_RATE_HZ = 100
+PLOT_LENGTH_S = 5
 
 node = live.Node()
+# connect to a DNS server to force socket to bind to a port
 node.tx_port.open_socket()
+node.tx_port.port.connect(('1.1.1.1', 80))
+IP = node.tx_port.port.getsockname()[0]
+
 parameters = {}
 plot_data = {}
 
@@ -56,8 +60,8 @@ def load_config(sender):
     node.set_parameters(parameters)
     plot_data = {
         id: {
-            'x': deque([0], maxlen=PLOT_SIZE),
-            'y': deque([0], maxlen=PLOT_SIZE)
+            'x': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+            'y': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
         } for id in parameters.keys()
     }
 
@@ -163,8 +167,23 @@ def update_plots():
                 dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
                 dpg.set_item_label(f'{id}_value', round(plot_data[id]['y'][-1], 3))
                 dpg.fit_axis_data(f'{id}_x')
-                dpg.fit_axis_data(f'{id}_y')
-        time.sleep(1 / PLOT_REFRESH_HZ)
+        time.sleep(1 / PLOT_RATE_HZ)
+
+def set_plot_size(sender, _):
+    global PLOT_LENGTH_S
+    global PLOT_RATE_HZ
+    global plot_data
+
+    PLOT_LENGTH_S = dpg.get_value('plot_length')
+    PLOT_RATE_HZ = dpg.get_value('plot_rate')
+
+    # create new deques of the right size
+    plot_data = {
+        id: {
+            'x': deque(plot_data[id]['x'], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+            'y': deque(plot_data[id]['y'], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
+        } for id in parameters.keys()
+    }
 
 # display options for port selection
 def set_port_type(sender, port_type):
@@ -251,6 +270,17 @@ with dpg.window(tag='window'):
                         pass
 
             with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_text(f'IP: {IP}', color=COLORS['gray'])
+                dpg.add_separator()
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text('Plot Length (s):')
+                    dpg.add_input_int(tag='plot_length', default_value=PLOT_LENGTH_S, min_value=1, min_clamped=True, callback=set_plot_size, width=100)
+                with dpg.group(horizontal=True):
+                    dpg.add_text('Plot Rate (Hz):')
+                    dpg.add_input_int(tag='plot_rate', default_value=PLOT_RATE_HZ, min_value=1, min_clamped=True, callback=set_plot_size, width=100)
+                dpg.add_separator()
+
                 # receive port selection
                 with dpg.group(horizontal=True):
                     dpg.add_text('Port:')
