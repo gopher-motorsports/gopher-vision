@@ -203,6 +203,22 @@ def set_port_socket(sender, _):
     except:
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
+def add_client(sender, _):
+    global node
+    host = dpg.get_value('client_add_host')
+    port = dpg.get_value('client_add_port')
+    node.add_client(host, port)
+    dpg.configure_item('client_btn', label=f'{len(node.clients)} clients')
+    dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
+
+def remove_client(sender, _):
+    global node
+    host = dpg.get_value('client_add_host')
+    port = dpg.get_value('client_add_port')
+    node.remove_client(host, port)
+    dpg.configure_item('client_btn', label=f'{len(node.clients)} clients')
+    dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
+
 dpg.create_context()
 dpg.create_viewport(title='GopherVision', width=800, height=600)
 dpg.set_viewport_vsync(True)
@@ -226,8 +242,9 @@ with dpg.window(tag='window'):
                 dpg.add_text('Done:', color=COLORS['gray'])
 
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
+            # receive port selection
             with dpg.group(horizontal=True):
-                dpg.add_text('RX Port:')
+                dpg.add_text('Port:')
                 dpg.add_combo(items=['Serial Port', 'Network Socket'], callback=set_port_type, width=150)
                 # dropdown for serial port selection - shown when 'Serial Port' is selected
                 dpg.add_combo(tag='port_serial', items=[], callback=set_port_serial, width=100, show=False)
@@ -237,6 +254,18 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='port_socket_set', label='Set', callback=set_port_socket, show=False)
                 # displays port status
                 dpg.add_text('No port open', tag='port_status', color=COLORS['red'])
+            # list of clients to forward data to
+            with dpg.group(horizontal=True):
+                dpg.add_text('Forward:')
+                dpg.add_button(tag='client_btn', label='0 clients')
+            with dpg.popup('client_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                with dpg.group(horizontal=True):
+                    dpg.add_input_text(tag='client_add_host', hint='host', width=100)
+                    dpg.add_input_text(tag='client_add_port', hint='port', width=100)
+                    dpg.add_button(label='Add', callback=add_client)
+                    dpg.add_button(label='Remove', callback=remove_client)
+                dpg.add_listbox(tag='client_list', items=[])
+            # button to add parameter plots
             dpg.add_button(tag='add_btn', label='Add Parameter +')
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))

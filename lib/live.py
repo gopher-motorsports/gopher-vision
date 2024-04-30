@@ -137,7 +137,8 @@ class Node:
         }
 
     def add_client(self, host: str, port: int):
-        self.clients.append((host, port))
+        if (host, port) not in self.clients:
+            self.clients.append((host, port))
 
     def remove_client(self, host: str, port: int):
         self.clients = list(filter(lambda addr: addr != (host, port), self.clients))
