@@ -7,6 +7,7 @@ import time
 import threading
 import serial
 import serial.tools.list_ports
+import csv
 
 from lib import gcan
 from lib import gdat
@@ -67,8 +68,10 @@ def load_config(sender):
 
     # update loaded config path
     dpg.configure_item('config_path', default_value=path, color=COLORS['green'])
-    # enable convert button once a config is loaded
+    # enable buttons once a config is loaded
     dpg.configure_item('convert_btn', enabled=True)
+    dpg.configure_item('preset_load', enabled=True)
+    dpg.configure_item('preset_save', enabled=True)
     # delete parameter table if it already exists
     if dpg.does_item_exist('parameter_table'):
         dpg.delete_item('parameter_table')
@@ -136,6 +139,9 @@ def convert(sender):
 # callback for "Add Parameter" button in Telemetry tab
 # creates a plot for a loaded GCAN parameter
 def add_plot(sender, app_data, pid):
+    global parameters
+    if pid not in parameters:
+        return
     parameter = parameters[pid]
 
     # clean-up in case this plot was removed and re-added
@@ -145,29 +151,57 @@ def add_plot(sender, app_data, pid):
     if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
 
     # add new plot
-    with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, parent='tab-telemetry'):
-        with dpg.plot(width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True):
+    with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry'):
+        with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
-# transfer values from receiver to plots at a fixed rate
-# called as a background daemon thread
-def update_plots():
-    global node
-    while True:
-        t = time.time()
-        for (id, value) in node.values.items():
-            # update plot data
-            plot_data[id]['x'].append(t)
-            plot_data[id]['y'].append(value)
-            # if plot is visible, update series
-            if dpg.does_item_exist(f'{id}_series'):
-                dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
-                dpg.set_item_label(f'{id}_value', round(plot_data[id]['y'][-1], 3))
-                dpg.fit_axis_data(f'{id}_x')
-        time.sleep(1 / PLOT_RATE_HZ)
+def load_preset(sender, app_data):
+    root = tk.Tk()
+    root.withdraw()
+    with filedialog.askopenfile(
+        title='Load GopherVision preset',
+        filetypes=[('CSV', '*.csv')]
+    ) as f:
+        reader = csv.DictReader(f)
+        # add plots for each preset entry
+        for row in reader:
+            pid = int(row['id'])
+            add_plot(None, None, pid)
+            dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+    root.destroy()
+
+def save_preset(sender, app_data):
+    global parameters
+    plots = []
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    # find currently visible plots
+    for pid in pids:
+        if dpg.is_item_visible(f'p_plot_{pid}'):
+            y_axis = dpg.get_axis_limits(f'{pid}_y')
+            plots.append({
+                'id': pid,
+                'name': parameters[pid]['name'],
+                'y_min': y_axis[0],
+                'y_max': y_axis[1],
+                'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
+            })
+    # sort by vertical position
+    plots.sort(key=lambda p: p['v_pos'])
+
+    root = tk.Tk()
+    root.withdraw()
+    with filedialog.asksaveasfile(
+        title='Save GopherVision preset',
+        filetypes=[('CSV', '*.csv')],
+        defaultextension='csv'
+    ) as f:
+        writer = csv.DictWriter(f, fieldnames=['id', 'name', 'y_min', 'y_max'], extrasaction='ignore', lineterminator='\n')
+        writer.writeheader()
+        writer.writerows(plots)
+    root.destroy()
 
 def set_plot_size(sender, _):
     global PLOT_LENGTH_S
@@ -262,14 +296,15 @@ with dpg.window(tag='window'):
 
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
             with dpg.group(horizontal=True):
-                # button to open settings modal
-                dpg.add_button(tag='settings_btn', label='Settings')
-                # button to add parameter plots
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
-                with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
-                    dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
-                    with dpg.filter_set(tag='parameter_list'):
-                        pass
+                dpg.add_button(tag='preset_load', label='Load Preset', callback=load_preset, enabled=False)
+                dpg.add_button(tag='preset_save', label='Save Preset', callback=save_preset, enabled=False)
+                dpg.add_button(tag='settings_btn', label='Settings')
+
+            with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
+                with dpg.filter_set(tag='parameter_list'):
+                    pass
 
             with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_text(f'IP: {IP}', color=COLORS['gray'])
@@ -309,6 +344,24 @@ with dpg.window(tag='window'):
 
 dpg.setup_dearpygui()
 dpg.show_viewport()
+
+# transfer values from receiver to plots at a configurable rate
+def update_plots():
+    global node
+    while True:
+        t = time.time()
+        for (id, value) in node.values.items():
+            # update plot data
+            plot_data[id]['x'].append(t)
+            plot_data[id]['y'].append(value)
+            # if plot is visible, update series
+            if dpg.does_item_exist(f'{id}_series'):
+                dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
+                dpg.set_item_label(f'{id}_value', round(plot_data[id]['y'][-1], 3))
+                dpg.fit_axis_data(f'{id}_x')
+        time.sleep(1 / PLOT_RATE_HZ)
+
 threading.Thread(target=update_plots, daemon=True).start()
+
 dpg.start_dearpygui()
 dpg.destroy_context()
