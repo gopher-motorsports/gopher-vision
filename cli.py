@@ -246,7 +246,7 @@ class Shell(cmd.Cmd):
         
         try:
             config_path = Path('../gophercan-lib/network_autogen/configs/') / name
-            self.config_params = gcan.load_path(config_path)
+            self.config_params = gcan.get_params(gcan.load_path(config_path))
         except:
             raise Exception(f'ERROR: failed to load "{config_path}"')
         self.config_name = name

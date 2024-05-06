@@ -22,8 +22,11 @@ def get_t0(sof):
     try:
         return time.strptime(sof.decode(), '/PLM_%Y-%m-%d-%H-%M-%S')
     except:
-        print(f'WARNING: failed to parse timestamp "{sof.decode()}"')
-        return time.gmtime(0)
+        try:
+            return time.strptime(sof.decode(), '/%Y-%m-%d-%H-%M-%S')
+        except:
+            print(f'WARNING: failed to parse timestamp "{sof.decode()}"')
+            return time.gmtime(0)
 
 # decode packets from a byte string and organize into channels
 def parse(bytes, parameters):
@@ -128,8 +131,10 @@ def parse(bytes, parameters):
         else:
             # get time delta between points
             deltas = np.diff(ch['points'][:,0])
-            # remove deltas above 100ms (minimum frequency of 10Hz)
+            # remove deltas above 100ms (minimum frequency = 10Hz)
             deltas = deltas[deltas <= 100]
+            # or below 1ms (maximum frequency = 1000Hz)
+            deltas = deltas[deltas >= 1]
             if len(deltas) == 0:
                 delta = 100
             else:

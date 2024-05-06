@@ -77,6 +77,7 @@ class Node:
         self.values = {}
         self.rx_port = Port()
         self.tx_port = Port()
+        self.record = None
         self.clients: list[tuple[str, int]] = []
         threading.Thread(target=self.loop, daemon=True).start()
 
@@ -89,13 +90,13 @@ class Node:
 
             # attempt to read a block of data
             try:
-                bytes = self.rx_port.read(BLOCK_SIZE)
+                block = self.rx_port.read(BLOCK_SIZE)
             except:
                 time.sleep(1)
                 continue
 
             # split block into packets and update channels
-            packets = bytes.split(START.to_bytes(1, 'big'))
+            packets = block.split(START.to_bytes(1, 'big'))
             for packet in packets:
                 # unescape packet
                 pkt = bytearray()
@@ -122,12 +123,19 @@ class Node:
                 # update latest value
                 self.values[id] = value
 
+            # record to .gdat file
+            if self.record is not None:
+                try:
+                    self.record.write(block)
+                except:
+                    self.close_record()
+
             # forward to clients
             for host, port in self.clients:
                 try:
-                    self.tx_port.send_to(bytes, host, port)
+                    self.tx_port.send_to(block, host, port)
                 except:
-                    continue
+                    pass
 
     def set_parameters(self, parameters: dict):
         self.parameters = parameters
@@ -142,3 +150,11 @@ class Node:
 
     def remove_client(self, host: str, port: int):
         self.clients = list(filter(lambda addr: addr != (host, port), self.clients))
+
+    def open_record(self, path: str):
+        self.record = open(path, 'wb')
+        self.record.write(f'/{time.strftime("%Y-%m-%d-%H-%M-%S")}.gdat:\n'.encode())
+    
+    def close_record(self):
+        self.record.close()
+        self.record = None

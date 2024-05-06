@@ -128,13 +128,16 @@ def convert(sender):
                 print(f'overwriting: {ld_path}')
                 ld_path.unlink()
             ld.write(ld_path, channels, t0)
+            # add path to done list
+            dpg.add_text(ld_path, parent='convert_done', color=COLORS['gray'])
         except Exception as err:
             print(f'failed to convert: {path}')
             print(err)
-        # update loading bar, add path to done list
+            # add path to failed list
+            dpg.add_text(path, parent='convert_failed', color=COLORS['gray'])
+        # update loading bar
         n += 1
         dpg.configure_item('convert_loading', default_value=(n / len(paths)), overlay=f'{n}/{len(paths)}')
-        dpg.add_text(ld_path, parent='convert_done', color=COLORS['gray'])
 
 # callback for "Add Parameter" button in Telemetry tab
 # creates a plot for a loaded GCAN parameter
@@ -158,7 +161,7 @@ def add_plot(sender, app_data, pid):
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
-def load_preset(sender, app_data):
+def load_preset(sender, _):
     root = tk.Tk()
     root.withdraw()
     with filedialog.askopenfile(
@@ -173,7 +176,7 @@ def load_preset(sender, app_data):
             dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
     root.destroy()
 
-def save_preset(sender, app_data):
+def save_preset(sender, _):
     global parameters
     plots = []
     pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
@@ -202,6 +205,29 @@ def save_preset(sender, app_data):
         writer.writeheader()
         writer.writerows(plots)
     root.destroy()
+
+def start_recording(sender, _):
+    global node
+
+    root = tk.Tk()
+    root.withdraw()
+    path = filedialog.asksaveasfilename(
+        title='Record data',
+        filetypes=[('GDAT', '*.gdat')],
+        defaultextension='gdat'
+    )
+    root.destroy()
+
+    if not path:
+        return
+    
+    node.open_record(path)
+    dpg.configure_item('record_path', default_value=path, color=COLORS['green'])
+
+def stop_recording(sender, _):
+    global node
+    node.close_record()
+    dpg.configure_item('record_path', default_value='Not recording', color=COLORS['red'])
 
 def set_plot_size(sender, _):
     global PLOT_LENGTH_S
@@ -293,6 +319,8 @@ with dpg.window(tag='window'):
             dpg.add_progress_bar(tag='convert_loading', width=200)
             with dpg.group(tag='convert_done'):
                 dpg.add_text('Done:', color=COLORS['gray'])
+            with dpg.group(tag='convert_failed'):
+                dpg.add_text('Failed:', color=COLORS['gray'])
 
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
             with dpg.group(horizontal=True):
@@ -308,6 +336,12 @@ with dpg.window(tag='window'):
 
             with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_text(f'IP: {IP}', color=COLORS['gray'])
+                dpg.add_separator()
+
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label='Record', callback=start_recording)
+                    dpg.add_button(label='Stop', callback=stop_recording)
+                dpg.add_text('Not recording', tag='record_path', color=COLORS['red'])
                 dpg.add_separator()
 
                 with dpg.group(horizontal=True):

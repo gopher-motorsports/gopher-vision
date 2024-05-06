@@ -58,12 +58,12 @@ except:
 
 parameters = gcan.get_params(config)
 pids = list(parameters.keys())
-start_ms = time.time()
+start = time.time()
 
 # generate a gdat packet with random data for the specified parameter ID
 def generate_packet():
     id = int(random.choice(pids))
-    timestamp = int(time.time() - start_ms) * 1000
+    timestamp = int((time.time() - start) * 1000)
 
     if parameters[id]['type'] == 'FLOATING':
         data = random.uniform(-100, 100)
