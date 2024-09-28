@@ -38,7 +38,6 @@ def load_config(sender):
     global node
     global parameters
     global plot_data
-
     # open file dialog
     root = tk.Tk()
     root.withdraw()
@@ -47,7 +46,6 @@ def load_config(sender):
         filetypes=[('YAML', '*.yaml')]
     )
     root.destroy()
-
     if not path:
         return
     
