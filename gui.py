@@ -39,7 +39,9 @@ def load_config(sender):
     global parameters
     global plot_data
     # open file dialog
+    print("test1")
     root = tk.Tk()
+    print("test2")
     root.withdraw()
     path = filedialog.askopenfilename(
         title='Open GopherCAN configuration',
