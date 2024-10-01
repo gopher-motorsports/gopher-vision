@@ -14,6 +14,9 @@ from lib import gdat
 from lib import ld
 from lib import live
 
+root = tk.Tk()
+root.withdraw()
+
 COLORS = {
     'red': (231, 76, 60),
     'green': (45, 245, 120),
@@ -32,22 +35,19 @@ IP = node.tx_port.port.getsockname()[0]
 parameters = {}
 plot_data = {}
 
-# callback for "Browse" button in GopherCAN tab
+# load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
-def load_config(sender):
+def load_config():
     global node
     global parameters
     global plot_data
     # open file dialog
-    print("test1")
-    root = tk.Tk()
-    print("test2")
-    root.withdraw()
-    path = filedialog.askopenfilename(
+    # root = tk.Tk()
+    # root.withdraw()
+    path = filedialog.askopenfilename( # Gives trace trap
         title='Open GopherCAN configuration',
         filetypes=[('YAML', '*.yaml')]
-    )
-    root.destroy()
+    ) 
     if not path:
         return
     
@@ -96,20 +96,16 @@ def load_config(sender):
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
-def convert(sender):
+def convert():
     global parameters
     if len(parameters) == 0:
         return
-
     # open file dialog to select 1+ .gdat files
-    root = tk.Tk()
-    root.withdraw()
     paths = filedialog.askopenfilename(
         title='Select Data',
         filetypes=[('GDAT', '*.gdat')],
         multiple=True
     )
-    root.destroy()
 
     n = 0
     dpg.configure_item('convert_loading', default_value=0.05, overlay=f'{n}/{len(paths)}')
@@ -309,13 +305,15 @@ with dpg.window(tag='window'):
         with dpg.tab(label='GopherCAN', tag='tab-gophercan'):
             with dpg.group(horizontal=True):
                 dpg.add_text('Load a GopherCAN configuration (.yaml):')
-                dpg.add_button(label='Browse', callback=load_config)
+                dpg.add_checkbox(tag='should_open_yaml', default_value=False, show=False)
+                dpg.add_button(label='Browse', callback=lambda: dpg.set_value('should_open_yaml', True))
             dpg.add_text('No configuration loaded', tag='config_path', color=COLORS['red'])
 
         with dpg.tab(label='Data Parser'):
             with dpg.group(horizontal=True):
                 dpg.add_text('Select data to convert (.gdat):')
-                dpg.add_button(tag='convert_btn', label='Convert', enabled=False, callback=convert)
+                dpg.add_checkbox(tag='convert_clicked', default_value=False, show=False)
+                dpg.add_button(tag='convert_btn', label='Convert', enabled=False, callback=lambda: dpg.set_value('convert_clicked', True))
             dpg.add_progress_bar(tag='convert_loading', width=200)
             with dpg.group(tag='convert_done'):
                 dpg.add_text('Done:', color=COLORS['gray'])
@@ -379,6 +377,20 @@ with dpg.window(tag='window'):
 dpg.setup_dearpygui()
 dpg.show_viewport()
 
+# checks for any TKinter calls
+while dpg.is_dearpygui_running():
+    if dpg.get_value('should_open_yaml'):
+        dpg.set_value('should_open_yaml', False)
+        load_config()
+
+    if dpg.get_value('convert_clicked'):
+        print("entered")
+        dpg.set_value('convert_clicked', False)
+        convert()
+
+    dpg.render_dearpygui_frame()
+    pass
+
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
     global node
@@ -398,4 +410,5 @@ def update_plots():
 threading.Thread(target=update_plots, daemon=True).start()
 
 dpg.start_dearpygui()
+root.destroy()
 dpg.destroy_context()

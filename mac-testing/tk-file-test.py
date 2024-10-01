@@ -1,3 +1,5 @@
+# this file browser code works on mac, so it is a problem integrating TK with DPG
+
 from tkinter import filedialog
 import tkinter as tk
 
