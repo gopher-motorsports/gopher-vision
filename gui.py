@@ -377,19 +377,7 @@ with dpg.window(tag='window'):
 dpg.setup_dearpygui()
 dpg.show_viewport()
 
-# checks for any TKinter calls
-while dpg.is_dearpygui_running():
-    if dpg.get_value('should_open_yaml'):
-        dpg.set_value('should_open_yaml', False)
-        load_config()
 
-    if dpg.get_value('convert_clicked'):
-        print("entered")
-        dpg.set_value('convert_clicked', False)
-        convert()
-
-    dpg.render_dearpygui_frame()
-    pass
 
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
@@ -408,6 +396,20 @@ def update_plots():
         time.sleep(1 / PLOT_RATE_HZ)
 
 threading.Thread(target=update_plots, daemon=True).start()
+
+# checks for any TKinter calls
+while dpg.is_dearpygui_running():
+    if dpg.get_value('should_open_yaml'):
+        dpg.set_value('should_open_yaml', False)
+        load_config()
+
+    if dpg.get_value('convert_clicked'):
+        print("entered")
+        dpg.set_value('convert_clicked', False)
+        convert()
+
+    dpg.render_dearpygui_frame()
+    pass
 
 dpg.start_dearpygui()
 root.destroy()
