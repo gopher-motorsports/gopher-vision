@@ -7,7 +7,7 @@ import random
 import socket
 
 sys.path.append('../')
-from lib import gcan
+import gcan
 sys.path.pop()
 
 # python tx.py [PORT] [CONFIG_NAME]

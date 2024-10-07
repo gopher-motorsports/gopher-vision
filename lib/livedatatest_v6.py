@@ -30,7 +30,6 @@ windowID_dict = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 
 # reads data from usb
 sys.path.append('../')
-from lib import gcan
 sys.path.pop()
 if len(sys.argv) != 3:
     print('invalid arguments, expected "python livedatatest_v6.py [PORT] [CONFIG_NAME]"')
