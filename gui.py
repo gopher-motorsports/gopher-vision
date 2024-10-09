@@ -157,9 +157,8 @@ def add_plot(sender, app_data, pid):
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
-def load_preset(sender, _):
-    root = tk.Tk()
-    root.withdraw()
+def load_preset():
+    print("entered")
     with filedialog.askopenfile(
         title='Load GopherVision preset',
         filetypes=[('CSV', '*.csv')]
@@ -170,9 +169,8 @@ def load_preset(sender, _):
             pid = int(row['id'])
             add_plot(None, None, pid)
             dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
-    root.destroy()
 
-def save_preset(sender, _):
+def save_preset():
     global parameters
     plots = []
     pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
@@ -190,8 +188,6 @@ def save_preset(sender, _):
     # sort by vertical position
     plots.sort(key=lambda p: p['v_pos'])
 
-    root = tk.Tk()
-    root.withdraw()
     with filedialog.asksaveasfile(
         title='Save GopherVision preset',
         filetypes=[('CSV', '*.csv')],
@@ -200,7 +196,6 @@ def save_preset(sender, _):
         writer = csv.DictWriter(f, fieldnames=['id', 'name', 'y_min', 'y_max'], extrasaction='ignore', lineterminator='\n')
         writer.writeheader()
         writer.writerows(plots)
-    root.destroy()
 
 def start_recording(sender, _):
     global node
@@ -323,8 +318,10 @@ with dpg.window(tag='window'):
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
             with dpg.group(horizontal=True):
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
-                dpg.add_button(tag='preset_load', label='Load Preset', callback=load_preset, enabled=False)
-                dpg.add_button(tag='preset_save', label='Save Preset', callback=save_preset, enabled=False)
+                dpg.add_checkbox(tag='load_preset_clicked', default_value=False, show=False)
+                dpg.add_checkbox(tag='save_preset_clicked', default_value=False, show=False)
+                dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
+                dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
                 dpg.add_button(tag='settings_btn', label='Settings')
 
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
@@ -398,15 +395,23 @@ def update_plots():
 threading.Thread(target=update_plots, daemon=True).start()
 
 # checks for any TKinter calls
+# forces TKinter calls to run on main thread
 while dpg.is_dearpygui_running():
     if dpg.get_value('should_open_yaml'):
         dpg.set_value('should_open_yaml', False)
         load_config()
 
     if dpg.get_value('convert_clicked'):
-        print("entered")
         dpg.set_value('convert_clicked', False)
         convert()
+
+    if dpg.get_value('save_preset_clicked'):
+        dpg.set_value('save_preset_clicked', False)
+        save_preset()
+
+    if dpg.get_value('load_preset_clicked'):
+        dpg.set_value('load_preset_clicked', False)
+        load_preset()
 
     dpg.render_dearpygui_frame()
     pass
