@@ -148,6 +148,7 @@ def add_plot(sender, app_data, pid):
     parameter = parameters[pid]
 
     # clean-up in case this plot was removed and re-added
+    if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}') # FIXED
     if dpg.does_alias_exist(f'{pid}_x'): dpg.remove_alias(f'{pid}_x')
     if dpg.does_alias_exist(f'{pid}_y'): dpg.remove_alias(f'{pid}_y')
     if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
@@ -155,7 +156,7 @@ def add_plot(sender, app_data, pid):
 
     # add new plot
     with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry'):
-        with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True):
+        with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True): # Added anti-aliasing
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
@@ -164,17 +165,16 @@ def add_plot(sender, app_data, pid):
 def load_preset(sender, _):
     root = tk.Tk()
     root.withdraw()
-    # with filedialog.askopenfile(
-    #     title='Load GopherVision preset',
-    #     filetypes=[('CSV', '*.csv')]
-    # ) as f:
-    
-    reader = csv.DictReader(f)
-    # add plots for each preset entry
-    for row in reader:
-        pid = int(row['id'])
-        add_plot(None, None, pid)
-        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+    with filedialog.askopenfile(
+        title='Load GopherVision preset',
+        filetypes=[('CSV', '*.csv')]
+    ) as f:
+        reader = csv.DictReader(f)
+        # add plots for each preset entry
+        for row in reader:
+            pid = int(row['id'])
+            add_plot(None, None, pid)
+            dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
     root.destroy()
 
 def save_preset(sender, _):
