@@ -1,4 +1,5 @@
 import dearpygui.dearpygui as dpg
+from dearpygui_ext.themes import create_theme_imgui_light
 from tkinter import filedialog
 import tkinter as tk
 from pathlib import Path
@@ -148,7 +149,7 @@ def add_plot(sender, app_data, pid):
     parameter = parameters[pid]
 
     # clean-up in case this plot was removed and re-added
-    if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}') # FIXED
+    if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
     if dpg.does_alias_exist(f'{pid}_x'): dpg.remove_alias(f'{pid}_x')
     if dpg.does_alias_exist(f'{pid}_y'): dpg.remove_alias(f'{pid}_y')
     if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
@@ -156,10 +157,13 @@ def add_plot(sender, app_data, pid):
 
     # add new plot
     with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry'):
-        with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True): # Added anti-aliasing
+        with dpg.theme(tag="plot_theme"):
+            dpg.add_theme_color(dpg.mvPlotCol_Line, (255, 255, 255), category=dpg.mvThemeCat_Plots)
+        with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
+            dpg.bind_item_theme(f'{pid}_series', "plot_theme")
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
 def load_preset(sender, _):
@@ -300,6 +304,8 @@ def remove_client(sender, _):
     dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
 
 dpg.create_context()
+light_theme = create_theme_imgui_light() # Imports light mode from dearpygui_ext
+dpg.bind_theme(light_theme)
 dpg.create_viewport(title='GopherVision', width=800, height=600)
 dpg.set_viewport_vsync(True)
 
