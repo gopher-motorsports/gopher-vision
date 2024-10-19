@@ -1,5 +1,6 @@
 import dearpygui.dearpygui as dpg
 from dearpygui_ext.themes import create_theme_imgui_light
+from dearpygui_ext.themes import create_theme_imgui_dark
 from tkinter import filedialog
 import tkinter as tk
 from pathlib import Path
@@ -144,11 +145,6 @@ def add_plot(sender, app_data, pid):
         return
     parameter = parameters[pid]
     
-    # creates theme for plots
-    with dpg.theme(tag="plot_theme"):
-        with dpg.theme_component(dpg.mvLineSeries):
-            dpg.add_theme_color(dpg.mvPlotCol_Line, (0, 0, 0), category=dpg.mvThemeCat_Plots)
-
     # clean-up in case this plot was removed and re-added
     if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
     if dpg.does_alias_exist(f'{pid}_x'): dpg.remove_alias(f'{pid}_x')
@@ -162,7 +158,6 @@ def add_plot(sender, app_data, pid):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
-            dpg.bind_item_theme(f'{pid}_series', "plot_theme")
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
 def load_preset():
@@ -296,10 +291,34 @@ def remove_client(sender, _):
     port = dpg.get_value('client_add_port')
     node.remove_client(host, port)
     dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
+    
+toggle = 0 # var for switching themes
+color_R = 255
+color_G = 255
+color_B = 255
+
+# callback for dark/light mode
+def toggle_mode(sender):
+    global toggle
+    global color_R
+    global color_G
+    global color_B
+    if (toggle == 0):
+        light_theme = create_theme_imgui_light() # Imports light mode from dearpygui_ext
+        dpg.bind_theme(light_theme)
+        toggle = 1
+        color_R = 0
+        color_G = 0
+        color_B = 0
+    else:
+        dark_theme = create_theme_imgui_dark()
+        dpg.bind_theme(dark_theme)
+        toggle = 0
+        color_R = 255
+        color_G = 255
+        color_B = 255
 
 dpg.create_context()
-light_theme = create_theme_imgui_light() # Imports light mode from dearpygui_ext
-dpg.bind_theme(light_theme)
 dpg.create_viewport(title='GopherVision', width=800, height=600)
 dpg.set_viewport_vsync(True)
 
@@ -328,6 +347,7 @@ with dpg.window(tag='window'):
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
             with dpg.group(horizontal=True):
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
+                dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
                 dpg.add_checkbox(tag='load_preset_clicked', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked', default_value=False, show=False)
                 dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
@@ -338,7 +358,7 @@ with dpg.window(tag='window'):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
                 with dpg.filter_set(tag='parameter_list'):
                     pass
-
+                        
             with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_text(f'IP: {IP}', color=COLORS['gray'])
                 dpg.add_separator()
@@ -390,6 +410,13 @@ dpg.show_viewport()
 def update_plots():
     global node
     while True:
+        
+        # creates theme for plots
+        if dpg.does_alias_exist('plot_theme'): dpg.remove_alias('plot_theme') # could cause slow data, might need to change/remove
+        with dpg.theme(tag="plot_theme"):
+            with dpg.theme_component(dpg.mvLineSeries):
+                dpg.add_theme_color(dpg.mvPlotCol_Line, (color_R, color_G, color_B), category=dpg.mvThemeCat_Plots)
+                
         t = time.time()
         for (id, value) in node.values.items():
             # update plot data
@@ -400,6 +427,7 @@ def update_plots():
                 dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
                 dpg.set_item_label(f'{id}_value', round(plot_data[id]['y'][-1], 3))
                 dpg.fit_axis_data(f'{id}_x')
+                dpg.bind_item_theme(f'{id}_series', "plot_theme")
         time.sleep(1 / PLOT_RATE_HZ)
 
 threading.Thread(target=update_plots, daemon=True).start()
