@@ -143,6 +143,11 @@ def add_plot(sender, app_data, pid):
     if pid not in parameters:
         return
     parameter = parameters[pid]
+    
+    # creates theme for plots
+    with dpg.theme(tag="plot_theme"):
+        with dpg.theme_component(dpg.mvLineSeries):
+            dpg.add_theme_color(dpg.mvPlotCol_Line, (0, 0, 0), category=dpg.mvThemeCat_Plots)
 
     # clean-up in case this plot was removed and re-added
     if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
@@ -157,6 +162,7 @@ def add_plot(sender, app_data, pid):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
+            dpg.bind_item_theme(f'{pid}_series', "plot_theme")
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
 def load_preset():
