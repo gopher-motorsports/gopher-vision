@@ -185,39 +185,38 @@ def save_preset():
 # creates new preset and upload to db
 def upload_preset(sender):
 
-    plots = []
-    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
-    # find currently visible plots
-    for pid in pids:
-        if dpg.is_item_visible(f'p_plot_{pid}'):
-            y_axis = dpg.get_axis_limits(f'{pid}_y')
-            plots.append({
-                'id': pid,
-                'name': parameters[pid]['name'],
-                'y_min': y_axis[0],
-                'y_max': y_axis[1],
-                'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
-            })
-    # sort by vertical position
-    plots.sort(key=lambda p: p['v_pos'])
-    print(plots)
-
-
+    # plots = []
     # pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
-    # pnames = []
-    # py_mins = []
-    # py_maxes = []
-    # new_preset_name = dpg.get_value("name_input")
     # # find currently visible plots
     # for pid in pids:
     #     # if dpg.is_item_visible(f'p_plot_{pid}'):
     #     y_axis = dpg.get_axis_limits(f'{pid}_y')
-    #     pnames.append(parameters[pid]['name'])
-    #     py_mins.append(y_axis[0])
-    #     py_maxes.append(y_axis[1])
-    # db.upload_preset(new_preset_name,pids,pnames,py_mins,py_maxes)
-    # dpg.add_selectable(parent='presets_list', label=new_preset_name, filter_key=new_preset_name, callback=load_preset, user_data=new_preset_name)
-    # dpg.delete_item("get_preset_name_window")
+    #     plots.append({
+    #         'id': pid,
+    #         'name': parameters[pid]['name'],
+    #         'y_min': y_axis[0],
+    #         'y_max': y_axis[1],
+    #         'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
+    #     })
+    # # sort by vertical position
+    # plots.sort(key=lambda p: p['v_pos'])
+    # print(plots)
+
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    pnames = []
+    py_mins = []
+    py_maxes = []
+    new_preset_name = dpg.get_value("name_input")
+    # find currently visible plots
+    for pid in pids:
+        # if dpg.is_item_visible(f'p_plot_{pid}'):
+        y_axis = dpg.get_axis_limits(f'{pid}_y')
+        pnames.append(parameters[pid]['name'])
+        py_mins.append(y_axis[0])
+        py_maxes.append(y_axis[1])
+    db.upload_preset(new_preset_name,pids,pnames,py_mins,py_maxes)
+    dpg.add_selectable(parent='presets_list', label=new_preset_name, filter_key=new_preset_name, callback=load_preset, user_data=new_preset_name)
+    dpg.delete_item("get_preset_name_window")
 
 def start_recording(sender, _):
     global node
