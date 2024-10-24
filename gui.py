@@ -13,6 +13,7 @@ from lib import gcan
 from lib import gdat
 from lib import ld
 from lib import live
+import db
 
 root = tk.Tk()
 root.withdraw()
@@ -94,6 +95,11 @@ def load_config():
     for parameter in parameters.values():
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
 
+    # create list of presets
+    available_presets = db.get_preset_names()
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
+
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
 def convert():
@@ -158,21 +164,27 @@ def add_plot(sender, app_data, pid):
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
 
-def load_preset():
-    print("entered")
-    with filedialog.askopenfile(
-        title='Load GopherVision preset',
-        filetypes=[('CSV', '*.csv')]
-    ) as f:
-        reader = csv.DictReader(f)
-        # add plots for each preset entry
-        for row in reader:
-            pid = int(row['id'])
-            add_plot(None, None, pid)
-            dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+def load_preset(sender, app_data, preset_name):
+    preset_info = db.get_preset_info(preset_name)
+    num_presets = len(preset_info[0]['id'])
 
+    for i in range(num_presets):
+        pid = preset_info[0]['id'][i]
+        y_min = preset_info[0]['y_min'][i]
+        y_max = preset_info[0]['y_max'][i]
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f'{pid}_y', float(y_min), float(y_max))
+
+# creates window that asks for preset name
 def save_preset():
-    global parameters
+    with dpg.window(label="Preset Name", tag="get_preset_name_window", width=300, height=200):
+        dpg.add_text("Enter preset name: ")
+        dpg.add_input_text(tag="name_input")
+        dpg.add_button(label="Create Preset", callback=upload_preset)
+
+# creates new preset and upload to db
+def upload_preset(sender):
+
     plots = []
     pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
     # find currently visible plots
@@ -188,15 +200,24 @@ def save_preset():
             })
     # sort by vertical position
     plots.sort(key=lambda p: p['v_pos'])
+    print(plots)
 
-    with filedialog.asksaveasfile(
-        title='Save GopherVision preset',
-        filetypes=[('CSV', '*.csv')],
-        defaultextension='csv'
-    ) as f:
-        writer = csv.DictWriter(f, fieldnames=['id', 'name', 'y_min', 'y_max'], extrasaction='ignore', lineterminator='\n')
-        writer.writeheader()
-        writer.writerows(plots)
+
+    # pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    # pnames = []
+    # py_mins = []
+    # py_maxes = []
+    # new_preset_name = dpg.get_value("name_input")
+    # # find currently visible plots
+    # for pid in pids:
+    #     # if dpg.is_item_visible(f'p_plot_{pid}'):
+    #     y_axis = dpg.get_axis_limits(f'{pid}_y')
+    #     pnames.append(parameters[pid]['name'])
+    #     py_mins.append(y_axis[0])
+    #     py_maxes.append(y_axis[1])
+    # db.upload_preset(new_preset_name,pids,pnames,py_mins,py_maxes)
+    # dpg.add_selectable(parent='presets_list', label=new_preset_name, filter_key=new_preset_name, callback=load_preset, user_data=new_preset_name)
+    # dpg.delete_item("get_preset_name_window")
 
 def start_recording(sender, _):
     global node
@@ -321,9 +342,16 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
                 dpg.add_checkbox(tag='load_preset_clicked', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked', default_value=False, show=False)
-                dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
+                dpg.add_button(tag='preset_load', label='Load Preset +', enabled=False)
+                # , callback=lambda: dpg.set_value('load_preset_clicked', True), 
                 dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
                 dpg.add_button(tag='settings_btn', label='Settings')
+
+
+            with dpg.popup('preset_load', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
+                with dpg.filter_set(tag='presets_list'):
+                    pass
 
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
