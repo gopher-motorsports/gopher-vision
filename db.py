@@ -1,8 +1,6 @@
 import os
 from supabase import create_client, Client
 
-# supabase project password: Go4-Visi@n!
-
 url = 'https://dfdnzxmtohnlzrtyigcw.supabase.co' 
 key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmZG56eG10b2hubHpydHlpZ2N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjk2NTIzNzUsImV4cCI6MjA0NTIyODM3NX0.1J0HBm00c76dWTrJZP-q34d24ToB5uq1i1BYtvbBPak'
 supabase: Client = create_client(url, key)
