@@ -5,3 +5,4 @@ rich
 dearpygui
 pyinstaller
 pyserial
+supabase
