@@ -296,13 +296,15 @@ toggle = 0 # var for switching themes
 color_R = 255
 color_G = 255
 color_B = 255
-
+toggle_press = 0
 # callback for dark/light mode
 def toggle_mode(sender):
     global toggle
     global color_R
     global color_G
     global color_B
+    global toggle_press
+    toggle_press = 1
     if (toggle == 0):
         light_theme = create_theme_imgui_light() # Imports light mode from dearpygui_ext
         dpg.bind_theme(light_theme)
@@ -404,19 +406,21 @@ with dpg.window(tag='window'):
 dpg.setup_dearpygui()
 dpg.show_viewport()
 
-
-
+# creates theme for plots
+def change_theme():
+    if dpg.does_alias_exist('plot_theme'): dpg.remove_alias('plot_theme')
+    with dpg.theme(tag="plot_theme"):
+        with dpg.theme_component(dpg.mvLineSeries):
+            dpg.add_theme_color(dpg.mvPlotCol_Line, (color_R, color_G, color_B), category=dpg.mvThemeCat_Plots)
+change_theme() # initialize theme
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
     global node
+    global toggle_press
     while True:
-        
-        # creates theme for plots
-        if dpg.does_alias_exist('plot_theme'): dpg.remove_alias('plot_theme') # could cause slow data, might need to change/remove
-        with dpg.theme(tag="plot_theme"):
-            with dpg.theme_component(dpg.mvLineSeries):
-                dpg.add_theme_color(dpg.mvPlotCol_Line, (color_R, color_G, color_B), category=dpg.mvThemeCat_Plots)
-                
+        if (toggle_press == 1):
+            change_theme()
+            toggle_press = 0
         t = time.time()
         for (id, value) in node.values.items():
             # update plot data
