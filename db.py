@@ -26,7 +26,6 @@ def get_preset_info(preset_name):
   preset_info = supabase.table("presets").select().eq("preset_name", preset_name).execute().data
   return preset_info
 
-
-
-
-
+# delete a preset from the database
+def delele_preset(preset_name):
+  response = supabase.table('presets').delete().eq('preset_name', preset_name).execute()

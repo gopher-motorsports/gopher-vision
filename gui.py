@@ -102,6 +102,9 @@ def load_config():
     for preset in available_presets:
         dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
 
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
+
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
 def convert():
@@ -178,6 +181,21 @@ def load_preset_db(sender, app_data, preset_name):
         add_plot(None, None, pid)
         dpg.set_axis_limits(f'{pid}_y', float(y_min), float(y_max))
 
+# delete a preset from the database
+def delete_preset_db(sender, app_data, preset_name):
+    db.delele_preset(preset_name)
+
+    available_presets = db.get_preset_names()
+    # delete presets list if it already exists, then re-add all presets
+    dpg.delete_item('presets_list', children_only=True)
+    dpg.delete_item('presets_list_delete', children_only=True)
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
+
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
+
+
 # load presets from csv file
 def load_preset_csv():
     with filedialog.askopenfile(
@@ -217,6 +235,7 @@ def upload_preset_db(sender):
             py_maxes.append(y_axis[1])
     db.upload_preset(new_preset_name,pids,pnames,py_mins,py_maxes)
     dpg.add_selectable(parent='presets_list', label=new_preset_name, filter_key=new_preset_name, callback=load_preset_db, user_data=new_preset_name)
+    dpg.add_selectable(parent='presets_list_delete', label=new_preset_name, filter_key=new_preset_name, callback=delete_preset_db, user_data=new_preset_name)
     dpg.delete_item("get_preset_name_window")
 
 # save preset to csv file
@@ -344,7 +363,7 @@ def remove_client(sender, _):
     dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
 
 dpg.create_context()
-dpg.create_viewport(title='GopherVision', width=800, height=600)
+dpg.create_viewport(title='GopherVision', width=900, height=600)
 dpg.set_viewport_vsync(True)
 
 with dpg.window(tag='window'):
@@ -378,12 +397,18 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
+                dpg.add_button(tag='delete_preset_db', label='Delete Preset (db)', enabled=False)
                 dpg.add_button(tag='settings_btn', label='Settings')
 
 
             with dpg.popup('preset_load_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
                 with dpg.filter_set(tag='presets_list'):
+                    pass
+
+            with dpg.popup('delete_preset_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
+                with dpg.filter_set(tag='presets_list_delete'):
                     pass
 
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
