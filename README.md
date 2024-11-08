@@ -128,6 +128,12 @@ Receives, parses, and plots .gdat packets from the specified serial or network p
 python live-plot.py [PORT] [CONFIG_NAME]
 ```
 
+
+### `db.py`
+
+This script includes functions that interact with the database storing presets.
+
+
 ## Contributing
 
 Build `GopherVision.exe`:
