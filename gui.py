@@ -1,4 +1,6 @@
 import dearpygui.dearpygui as dpg
+from dearpygui_ext.themes import create_theme_imgui_light
+from dearpygui_ext.themes import create_theme_imgui_dark
 from tkinter import filedialog
 import tkinter as tk
 from pathlib import Path
@@ -13,6 +15,7 @@ from lib import gcan
 from lib import gdat
 from lib import ld
 from lib import live
+import db
 
 root = tk.Tk()
 root.withdraw()
@@ -71,8 +74,10 @@ def load_config():
     dpg.configure_item('config_path', default_value=path, color=COLORS['green'])
     # enable buttons once a config is loaded
     dpg.configure_item('convert_btn', enabled=True)
-    dpg.configure_item('preset_load', enabled=True)
-    dpg.configure_item('preset_save', enabled=True)
+    dpg.configure_item('preset_load_db', enabled=True)
+    dpg.configure_item('preset_save_db', enabled=True)
+    dpg.configure_item('preset_load_csv', enabled=True)
+    dpg.configure_item('preset_save_csv', enabled=True)
     # delete parameter table if it already exists
     if dpg.does_item_exist('parameter_table'):
         dpg.delete_item('parameter_table')
@@ -94,6 +99,14 @@ def load_config():
     dpg.delete_item('parameter_list', children_only=True)
     for parameter in parameters.values():
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
+
+    # create list of presets
+    available_presets = db.get_preset_names()
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
+
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
@@ -174,8 +187,35 @@ def add_plot(sender, app_data, pid):
         is_collumn_two = True
         last_coord = (0,last_coord[1]+175)
 
-def load_preset():
-    print("entered")
+# load presets from database
+def load_preset_db(sender, app_data, preset_name):
+    preset_info = db.get_preset_info(preset_name)
+    num_presets = len(preset_info[0]['id'])
+
+    for i in range(num_presets):
+        pid = preset_info[0]['id'][i]
+        y_min = preset_info[0]['y_min'][i]
+        y_max = preset_info[0]['y_max'][i]
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f'{pid}_y', float(y_min), float(y_max))
+
+# delete a preset from the database
+def delete_preset_db(sender, app_data, preset_name):
+    db.delele_preset(preset_name)
+
+    available_presets = db.get_preset_names()
+    # delete presets list if it already exists, then re-add all presets
+    dpg.delete_item('presets_list', children_only=True)
+    dpg.delete_item('presets_list_delete', children_only=True)
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
+
+    for preset in available_presets:
+        dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
+
+
+# load presets from csv file
+def load_preset_csv():
     with filedialog.askopenfile(
         title='Load GopherVision preset',
         filetypes=[('CSV', '*.csv')]
@@ -187,21 +227,55 @@ def load_preset():
             add_plot(None, None, pid)
             dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
 
-def save_preset():
+# creates window that asks for preset name
+def save_preset_db(sender):
+    with dpg.window(label="Preset Name", tag="get_preset_name_window", width=300, height=200):
+        dpg.add_text("Enter preset name: ")
+        dpg.add_input_text(tag="name_input")
+        dpg.add_button(label="Create Preset", callback=upload_preset_db)
+
+# creates new preset and upload to db
+def upload_preset_db(sender):
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    pnames = []
+    py_mins = []
+    py_maxes = []
+    new_preset_name = dpg.get_value("name_input")
+    for pid in pids:
+        y_axis = dpg.get_axis_limits(f'{pid}_y')
+        pnames.append(parameters[pid]['name'])
+        # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
+        if (y_axis[0] == 0 and y_axis[1] == 0):
+            py_mins.append(-0.5)
+            py_maxes.append(0.5)
+        else:
+            py_mins.append(y_axis[0])
+            py_maxes.append(y_axis[1])
+    db.upload_preset(new_preset_name,pids,pnames,py_mins,py_maxes)
+    dpg.add_selectable(parent='presets_list', label=new_preset_name, filter_key=new_preset_name, callback=load_preset_db, user_data=new_preset_name)
+    dpg.add_selectable(parent='presets_list_delete', label=new_preset_name, filter_key=new_preset_name, callback=delete_preset_db, user_data=new_preset_name)
+    dpg.delete_item("get_preset_name_window")
+
+# save preset to csv file
+def save_preset_csv():
     global parameters
     plots = []
     pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
     # find currently visible plots
     for pid in pids:
-        if dpg.is_item_visible(f'p_plot_{pid}'):
-            y_axis = dpg.get_axis_limits(f'{pid}_y')
-            plots.append({
-                'id': pid,
-                'name': parameters[pid]['name'],
-                'y_min': y_axis[0],
-                'y_max': y_axis[1],
-                'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
-            })
+        # if dpg.is_item_visible(f'p_plot_{pid}'):
+        y_axis = dpg.get_axis_limits(f'{pid}_y')
+        # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
+        if (y_axis[0] == 0 and y_axis[1] == 0): 
+            y_axis[0] = -0.5
+            y_axis[1] = 0.5
+        plots.append({
+            'id': pid,
+            'name': parameters[pid]['name'],
+            'y_min': y_axis[0],
+            'y_max': y_axis[1],
+            'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
+        })
     # sort by vertical position
     plots.sort(key=lambda p: p['v_pos'])
 
@@ -305,6 +379,34 @@ def remove_client(sender, _):
     port = dpg.get_value('client_add_port')
     node.remove_client(host, port)
     dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
+    
+toggle = 0 # var for switching themes
+color_R = 255
+color_G = 255
+color_B = 255
+toggle_press = 0
+# callback for dark/light mode
+def toggle_mode(sender):
+    global toggle
+    global color_R
+    global color_G
+    global color_B
+    global toggle_press
+    toggle_press = 1
+    if (toggle == 0):
+        light_theme = create_theme_imgui_light() # Imports light mode from dearpygui_ext
+        dpg.bind_theme(light_theme)
+        toggle = 1
+        color_R = 0
+        color_G = 0
+        color_B = 0
+    else:
+        dark_theme = create_theme_imgui_dark()
+        dpg.bind_theme(dark_theme)
+        toggle = 0
+        color_R = 255
+        color_G = 255
+        color_B = 255
 
 dpg.create_context()
 dpg.create_viewport(title='GopherVision', width=800, height=600)
@@ -335,17 +437,38 @@ with dpg.window(tag='window'):
         with dpg.tab(label='Telemetry', tag='tab-telemetry'):
             with dpg.group(horizontal=True):
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
+                dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
+                dpg.add_checkbox(tag='load_preset_clicked_csv', default_value=False, show=False)
+                dpg.add_checkbox(tag='save_preset_clicked_csv', default_value=False, show=False)
+                dpg.add_button(tag='preset_load_csv', label='Load Preset (csv)', callback=lambda: dpg.set_value('load_preset_clicked_csv', True), enabled=False)
+                dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
+                dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
+                dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
+                dpg.add_button(tag='delete_preset_db', label='Delete Preset (db)', enabled=False)
+                dpg.add_button(tag='settings_btn', label='Settings')
+
+
+            with dpg.popup('preset_load_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
+                with dpg.filter_set(tag='presets_list'):
+                    pass
+
+            with dpg.popup('delete_preset_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
+                with dpg.filter_set(tag='presets_list_delete'):
+                    pass
+
                 dpg.add_checkbox(tag='load_preset_clicked', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked', default_value=False, show=False)
                 dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
                 dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
-                dpg.add_button(tag='settings_btn', label='Settings')
+                #dpg.add_button(tag='settings_btn', label='Settings')
 
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
                 with dpg.filter_set(tag='parameter_list'):
                     pass
-
+                        
             with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_text(f'IP: {IP}', color=COLORS['gray'])
                 dpg.add_separator()
@@ -391,12 +514,21 @@ with dpg.window(tag='window'):
 dpg.setup_dearpygui()
 dpg.show_viewport()
 
-
-
+# creates theme for plots
+def change_theme():
+    if dpg.does_alias_exist('plot_theme'): dpg.remove_alias('plot_theme')
+    with dpg.theme(tag="plot_theme"):
+        with dpg.theme_component(dpg.mvLineSeries):
+            dpg.add_theme_color(dpg.mvPlotCol_Line, (color_R, color_G, color_B), category=dpg.mvThemeCat_Plots)
+change_theme() # initialize theme
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
     global node
+    global toggle_press
     while True:
+        if (toggle_press == 1):
+            change_theme()
+            toggle_press = 0
         t = time.time()
         for (id, value) in node.values.items():
             # update plot data
@@ -407,6 +539,7 @@ def update_plots():
                 dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
                 dpg.set_item_label(f'{id}_value', round(plot_data[id]['y'][-1], 3))
                 dpg.fit_axis_data(f'{id}_x')
+                dpg.bind_item_theme(f'{id}_series', "plot_theme")
         time.sleep(1 / PLOT_RATE_HZ)
 
 threading.Thread(target=update_plots, daemon=True).start()
@@ -422,13 +555,13 @@ while dpg.is_dearpygui_running():
         dpg.set_value('convert_clicked', False)
         convert()
 
-    if dpg.get_value('save_preset_clicked'):
-        dpg.set_value('save_preset_clicked', False)
-        save_preset()
+    if dpg.get_value('save_preset_clicked_csv'):
+        dpg.set_value('save_preset_clicked_csv', False)
+        save_preset_csv()
 
-    if dpg.get_value('load_preset_clicked'):
-        dpg.set_value('load_preset_clicked', False)
-        load_preset()
+    if dpg.get_value('load_preset_clicked_csv'):
+        dpg.set_value('load_preset_clicked_csv', False)
+        load_preset_csv()
 
     dpg.render_dearpygui_frame()
     pass
