@@ -27,7 +27,7 @@ COLORS = {
 PLOT_RATE_HZ = 100
 PLOT_LENGTH_S = 5
 
-T_HOSTNAME = "GrantsGarudaDeskt"
+T_HOSTNAME = "GrantsGarudaDesk"
 
 node = live.Node()
 # connect to a DNS server to force socket to bind to a port
@@ -50,17 +50,17 @@ def load_config():
     path = filedialog.askopenfilename( # Gives trace trap
         title='Open GopherCAN configuration',
         filetypes=[('YAML', '*.yaml')]
-    ) 
+    )
     if not path:
         return
-    
+
     # load GopherCAN parameters
     try:
         parameters = gcan.get_params(gcan.load_path(path))
     except:
         print(f'ERROR: failed to collect parameters from "{path}"')
         return
-    
+
     node.set_parameters(parameters)
     plot_data = {
         id: {
@@ -215,7 +215,7 @@ def start_recording(sender, _):
 
     if not path:
         return
-    
+
     node.open_record(path)
     dpg.configure_item('record_path', default_value=path, color=COLORS['green'])
 
@@ -281,6 +281,8 @@ def set_port_socket(sender, _, host = None, port = None):
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
 import socket # Imported here because I would like to move this function out of gui.py if possible
+client = socket.socket()
+connected = False
 
 def manage_client(client_socket, addr):
     global node
@@ -313,6 +315,22 @@ def host_trackside():
         thread = threading.Thread(target=manage_client, args=(client_socket, addr,))
         thread.start()
         break
+
+def trackside_connect(sender, _):
+    global client, connected
+    if connected: return
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((T_HOSTNAME, 5001))
+
+    client.send("connect".encode("utf-8")[:1024])
+    response = client.recv(1024).decode("utf-8")
+
+    if response == "accepted":
+        # Listen for data over UDP
+        set_port_socket(0, 0, IP, '5002')
+        connected = True
+    else:
+        print(f"Received: {response}")
 
 
 # Start hosting if called from cmd with argument host (python gui.py host)
