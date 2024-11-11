@@ -205,17 +205,21 @@ def delete_preset_db(sender, app_data, preset_name):
 
 
 # load presets from csv file
-def load_preset_csv():
-    with filedialog.askopenfile(
-        title='Load GopherVision preset',
-        filetypes=[('CSV', '*.csv')]
-    ) as f:
-        reader = csv.DictReader(f)
-        # add plots for each preset entry
-        for row in reader:
-            pid = int(row['id'])
-            add_plot(None, None, pid)
-            dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+def load_preset_csv(file=None):
+    if file:
+        f = open(file)
+    else:
+        f = filedialog.askopenfile(
+            title='Load GopherVision preset',
+            filetypes=[('CSV', '*.csv')])
+
+    reader = csv.DictReader(f)
+    # add plots for each preset entry
+    for row in reader:
+        pid = int(row['id'])
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+    f.close()
 
 # creates window that asks for preset name
 def save_preset_db(sender):
@@ -558,12 +562,12 @@ def change_theme():
 change_theme() # initialize theme
 
 
-# Start hosting if called from cmd with argument host (python gui.py host yaml_config db)
+# Start hosting if called from cmd with argument host (python gui.py host yaml_config csv)
 if len(argv) > 1 and argv[1] == "host":
     if len(argv) > 2:
         load_config(argv[2])  # set CAN config
         if len(argv) > 3:
-            load_preset_db(0, 0, argv[3])  # set db
+            load_preset_csv(argv[3])  # set csv
         dpg.set_value('tab-bar', 'tab-telemetry')  # set tab
     # change_theme() # light mode TODO: Doesn't work
     dpg.toggle_viewport_fullscreen()  # fullscreen
