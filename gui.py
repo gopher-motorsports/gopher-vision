@@ -43,19 +43,22 @@ plot_data = {}
 
 # load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
-def load_config():
+def load_config(file = None):
     global node
     global parameters
     global plot_data
     # open file dialog
     # root = tk.Tk()
     # root.withdraw()
-    path = filedialog.askopenfilename( # Gives trace trap
-        title='Open GopherCAN configuration',
-        filetypes=[('YAML', '*.yaml')]
-    )
-    if not path:
-        return
+    if file:
+        path = file
+    else:
+        path = filedialog.askopenfilename( # Gives trace trap
+            title='Open GopherCAN configuration',
+            filetypes=[('YAML', '*.yaml')]
+        )
+        if not path:
+            return
 
     # load GopherCAN parameters
     try:
@@ -389,7 +392,7 @@ def host_trackside():
         print("Listening for connection requests")
         while True:
             client_socket, addr = server.accept()
-            print('Got connection from', addr)
+            print("Got connection from", addr)
             thread = threading.Thread(target=manage_client, args=(client_socket, addr,))
             thread.start()
     except Exception as e:
@@ -413,12 +416,6 @@ def trackside_connect(sender, _):
         connected = True
     else:
         print(f"Received: {response}")
-
-
-# Start hosting if called from cmd with argument host (python gui.py host)
-if len(argv) > 1 and argv[1] == "host":
-    print("starting server")
-    threading.Thread(target=host_trackside, daemon=True).start()
 
 
 toggle = 0 # var for switching themes
@@ -456,7 +453,7 @@ dpg.set_viewport_vsync(True)
 with dpg.window(tag='window'):
     dpg.set_primary_window('window', True)
 
-    with dpg.tab_bar():
+    with dpg.tab_bar(tag='tab-bar'):
         with dpg.tab(label='GopherCAN', tag='tab-gophercan'):
             with dpg.group(horizontal=True):
                 dpg.add_text('Load a GopherCAN configuration (.yaml):')
@@ -559,6 +556,22 @@ def change_theme():
         with dpg.theme_component(dpg.mvLineSeries):
             dpg.add_theme_color(dpg.mvPlotCol_Line, (color_R, color_G, color_B), category=dpg.mvThemeCat_Plots)
 change_theme() # initialize theme
+
+
+# Start hosting if called from cmd with argument host (python gui.py host yaml_config db)
+if len(argv) > 1 and argv[1] == "host":
+    if len(argv) > 2:
+        load_config(argv[2])  # set CAN config
+        if len(argv) > 3:
+            load_preset_db(0, 0, argv[3])  # set db
+        dpg.set_value('tab-bar', 'tab-telemetry')  # set tab
+    # change_theme() # light mode TODO: Doesn't work
+    dpg.toggle_viewport_fullscreen()  # fullscreen
+
+    # Open server to listen for connection requests
+    print("starting server")
+    threading.Thread(target=host_trackside, daemon=True).start()
+
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
     global node
