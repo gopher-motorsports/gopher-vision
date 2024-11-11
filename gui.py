@@ -410,7 +410,11 @@ def trackside_connect(sender, _):
     if connected: return
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host = dpg.get_value('trackside_hostname')
-    client.connect((host, 5001))
+    try:
+        client.connect((host, 5001))
+    except:
+        print("Error connecting to host")
+        return
 
     client.send("connect".encode("utf-8")[:1024])
     response = client.recv(1024).decode("utf-8")
