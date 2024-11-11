@@ -409,7 +409,8 @@ def trackside_connect(sender, _):
     global client, connected
     if connected: return
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect((T_HOSTNAME, 5001))
+    host = dpg.get_value('trackside_hostname')
+    client.connect((host, 5001))
 
     client.send("connect".encode("utf-8")[:1024])
     response = client.recv(1024).decode("utf-8")
@@ -547,7 +548,9 @@ with dpg.window(tag='window'):
                 if len(argv) < 2 or argv[1] != "host":
                     dpg.add_separator()
                     dpg.add_text('Trackside Server:')
-                    dpg.add_button(label='Connect', callback=trackside_connect)
+                    with dpg.group(horizontal=True):
+                        dpg.add_input_text(tag='trackside_hostname', hint='host', default_value=T_HOSTNAME, width=150)
+                        dpg.add_button(label='Connect', callback=trackside_connect)
 
 
 dpg.setup_dearpygui()
