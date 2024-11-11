@@ -1,3 +1,4 @@
+from sys import argv
 import dearpygui.dearpygui as dpg
 from tkinter import filedialog
 import tkinter as tk
@@ -25,6 +26,8 @@ COLORS = {
 
 PLOT_RATE_HZ = 100
 PLOT_LENGTH_S = 5
+
+T_HOSTNAME = "GrantsGarudaDeskt"
 
 node = live.Node()
 # connect to a DNS server to force socket to bind to a port
@@ -264,10 +267,11 @@ def set_port_serial(sender, port_name):
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
 # callback for  "Set" button when entering a network port
-def set_port_socket(sender, _):
+def set_port_socket(sender, _, host = None, port = None):
     global node
-    host = dpg.get_value('port_socket_host')
-    port = dpg.get_value('port_socket_port')
+    if host is None:
+        host = dpg.get_value('port_socket_host')
+        port = dpg.get_value('port_socket_port')
     try:
         dpg.configure_item('port_status', default_value=f'opening {host}:{port} ...', color=COLORS['gray'])
         node.rx_port.bind_socket(host, port)
@@ -276,19 +280,46 @@ def set_port_socket(sender, _):
         print(err)
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
-def add_client(sender, _):
-    global node
-    host = dpg.get_value('client_add_host')
-    port = dpg.get_value('client_add_port')
-    node.add_client(host, port)
-    dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
+import socket # Imported here because I would like to move this function out of gui.py if possible
 
-def remove_client(sender, _):
+def manage_client(client_socket, addr):
     global node
-    host = dpg.get_value('client_add_host')
-    port = dpg.get_value('client_add_port')
-    node.remove_client(host, port)
-    dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
+    try:
+        while True:
+            request = client_socket.recv(1024).decode("utf-8")
+            if request.lower() == "close":
+                client_socket.send("closed".encode("utf-8"))
+                break
+            print(f"Received: {request}")
+            node.add_client(addr[0], 5002)
+            print("Now sending to: ")
+            print(node.clients)
+            client_socket.send("accepted".encode("utf-8"))
+    except Exception as e:
+        print(f"Error when hanlding client: {e}")
+    finally:
+        client_socket.close()
+        print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+
+def host_trackside():
+    # Use default TCP so connection request doesn't get missed
+    server = socket.socket()
+    server.bind((T_HOSTNAME, 5001))
+    server.listen(5)
+    print("Listening for connection requests")
+    while True:
+        client_socket, addr = server.accept()
+        print('Got connection from', addr)
+        thread = threading.Thread(target=manage_client, args=(client_socket, addr,))
+        thread.start()
+        break
+
+
+# Start hosting if called from cmd with argument host (python gui.py host)
+if len(argv) > 1 and argv[1] == "host":
+    print("starting server")
+    threading.Thread(target=host_trackside, daemon=True).start()
+
 
 dpg.create_context()
 dpg.create_viewport(title='GopherVision', width=800, height=600)
@@ -361,16 +392,13 @@ with dpg.window(tag='window'):
                     dpg.add_button(tag='port_socket_set', label='Set', callback=set_port_socket, show=False)
                 # displays port status
                 dpg.add_text('No port open', tag='port_status', color=COLORS['red'])
-                dpg.add_separator()
 
-                # list of clients to forward data to
-                dpg.add_text('Forward data to:')
-                dpg.add_listbox(tag='client_list', items=[])
-                with dpg.group(horizontal=True):
-                    dpg.add_input_text(tag='client_add_host', hint='host', width=100)
-                    dpg.add_input_text(tag='client_add_port', hint='port', width=100)
-                    dpg.add_button(label='Add', callback=add_client)
-                    dpg.add_button(label='Remove', callback=remove_client)
+                # display trackside connect button if not the host
+                if len(argv) < 2 or argv[1] != "host":
+                    dpg.add_separator()
+                    dpg.add_text('Trackside Server:')
+                    dpg.add_button(label='Connect', callback=trackside_connect)
+
 
 dpg.setup_dearpygui()
 dpg.show_viewport()
