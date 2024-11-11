@@ -107,11 +107,12 @@ def load_config(file = None):
 
     # create list of presets
     available_presets = db.get_preset_names()
-    for preset in available_presets:
-        dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
+    if available_presets:
+        for preset in available_presets:
+            dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
 
-    for preset in available_presets:
-        dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
+        for preset in available_presets:
+            dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
