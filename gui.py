@@ -167,6 +167,7 @@ def add_plot(sender, app_data, pid):
     with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry'):
         with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
+            #dpg.set_axis_ticks('{pid}_x', )
             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
@@ -392,9 +393,15 @@ def toggle_mode(sender):
         color_G = 255
         color_B = 255
 
+
+# Use tkinter to get the screen's width and height
+screen_width = root.winfo_screenwidth() + 20
+screen_height = root.winfo_screenheight()
+
 dpg.create_context()
-dpg.create_viewport(title='GopherVision', width=800, height=600)
+dpg.create_viewport(title='GopherVision', width=screen_width, height=screen_height)
 dpg.set_viewport_vsync(True)
+dpg.set_viewport_pos([0,0])
 
 with dpg.window(tag='window'):
     dpg.set_primary_window('window', True)
@@ -504,6 +511,7 @@ def change_theme():
     with dpg.theme(tag="plot_theme"):
         with dpg.theme_component(dpg.mvLineSeries):
             dpg.add_theme_color(dpg.mvPlotCol_Line, (color_R, color_G, color_B), category=dpg.mvThemeCat_Plots)
+            
 change_theme() # initialize theme
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
