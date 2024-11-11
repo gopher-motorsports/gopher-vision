@@ -403,7 +403,7 @@ def host_trackside():
     except Exception as e:
         print("Could not host server")
         print(f"Error: {e}")
-        dpg.stop_dearpygui() # TODO: consider not killing gui, just displaying message
+        dpg.stop_dearpygui() # TODO: consider not killing gui, just displaying message?
         exit()
 
 def trackside_connect(sender, _):
@@ -415,6 +415,7 @@ def trackside_connect(sender, _):
         client.connect((host, 5001))
     except:
         print("Error connecting to host")
+        dpg.configure_item('port_status', default_value='Connection failed', color=COLORS['red'])
         return
 
     client.send("connect".encode("utf-8")[:1024])
