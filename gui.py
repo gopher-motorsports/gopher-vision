@@ -570,12 +570,14 @@ def change_theme():
 change_theme() # initialize theme
 
 
-# Start hosting if called from cmd with argument host (python gui.py host yaml_config csv)
+# Start hosting if called from cmd with argument host (python gui.py host yaml_config csv port)
 if len(argv) > 1 and argv[1] == "host":
     if len(argv) > 2:
         load_config(argv[2])  # set CAN config
         if len(argv) > 3:
             load_preset_csv(argv[3])  # set csv
+            if len(argv) > 4:
+                set_port_serial(0, argv[4])  # set port
         dpg.set_value('tab-bar', 'tab-telemetry')  # set tab
     # change_theme() # light mode TODO: Doesn't work
     dpg.toggle_viewport_fullscreen()  # fullscreen
