@@ -27,7 +27,7 @@ COLORS = {
 PLOT_RATE_HZ = 100
 PLOT_LENGTH_S = 5
 
-T_HOSTNAME = "GrantsGarudaDesk"
+T_HOSTNAME = "GopherTrackPC"
 
 node = live.Node()
 # connect to a DNS server to force socket to bind to a port
@@ -302,19 +302,27 @@ def manage_client(client_socket, addr):
     finally:
         client_socket.close()
         print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+        node.remove_client(addr[0], 5002)
+        print("Now sending to: ")
+        print(node.clients)
 
 def host_trackside():
-    # Use default TCP so connection request doesn't get missed
-    server = socket.socket()
-    server.bind((T_HOSTNAME, 5001))
-    server.listen(5)
-    print("Listening for connection requests")
-    while True:
-        client_socket, addr = server.accept()
-        print('Got connection from', addr)
-        thread = threading.Thread(target=manage_client, args=(client_socket, addr,))
-        thread.start()
-        break
+    try:
+        # Use default TCP so connection request doesn't get missed
+        server = socket.socket()
+        server.bind(('', 5001))
+        server.listen(5)
+        print("Listening for connection requests")
+        while True:
+            client_socket, addr = server.accept()
+            print('Got connection from', addr)
+            thread = threading.Thread(target=manage_client, args=(client_socket, addr,))
+            thread.start()
+    except Exception as e:
+        print("Could not host server")
+        print(f"Error: {e}")
+        dpg.stop_dearpygui() # TODO: consider not killing gui, just displaying message
+        exit()
 
 def trackside_connect(sender, _):
     global client, connected
