@@ -3,6 +3,7 @@ numpy
 matplotlib
 rich
 dearpygui
+dearpygui_ext
 pyinstaller
 pyserial
 supabase
