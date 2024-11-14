@@ -50,7 +50,7 @@ except:
         exit()
 
 try:
-    config_path = Path('../../gophercan-lib/network_autogen/configs/') / CONFIG_NAME
+    config_path = CONFIG_NAME
     config = gcan.load_path(config_path)
 except:
     print(f'ERROR: no config found at "{config_path}"')
