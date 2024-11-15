@@ -460,7 +460,7 @@ def toggle_mode(sender):
 
 
 # Use tkinter to get the screen's width and height
-screen_width = root.winfo_screenwidth() + 20
+screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 
 dpg.create_context()
