@@ -516,8 +516,8 @@ with dpg.window(tag='window'):
 
                 dpg.add_checkbox(tag='load_preset_clicked', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked', default_value=False, show=False)
-                dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
-                dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
+                # dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
+                # dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
                 #dpg.add_button(tag='settings_btn', label='Settings')
 
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
