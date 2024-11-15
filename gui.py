@@ -496,11 +496,11 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
                 dpg.add_checkbox(tag='load_preset_clicked_csv', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked_csv', default_value=False, show=False)
-                dpg.add_button(tag='preset_load_csv', label='Load Preset (csv)', callback=lambda: dpg.set_value('load_preset_clicked_csv', True), enabled=False)
-                dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
                 dpg.add_button(tag='delete_preset_db', label='Delete Preset (db)', enabled=False)
+                dpg.add_button(tag='preset_load_csv', label='Load Preset (csv)', callback=lambda: dpg.set_value('load_preset_clicked_csv', True), enabled=False)
+                dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
                 dpg.add_button(tag='settings_btn', label='Settings')
 
 
