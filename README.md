@@ -1,3 +1,5 @@
+Go4-24e Config: https://github.com/gopher-motorsports/gophercan-lib/blob/main/network_autogen%2Fconfigs%2Fgo4-24e.yaml
+
 **GopherVision** is a collection of Python utilities for interacting with Gopher Motorsports data.
 
 ## Quickstart
