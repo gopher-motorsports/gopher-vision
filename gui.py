@@ -83,6 +83,7 @@ def load_config(file = None):
     dpg.configure_item('preset_save_db', enabled=True)
     dpg.configure_item('preset_load_csv', enabled=True)
     dpg.configure_item('preset_save_csv', enabled=True)
+    dpg.configure_item('clear_parameters', enabled=True)
     # delete parameter table if it already exists
     if dpg.does_item_exist('parameter_table'):
         dpg.delete_item('parameter_table')
@@ -171,7 +172,7 @@ def add_plot(sender, app_data, pid):
     if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
 
     # add new plot
-    with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry'):
+    with dpg.collapsing_header(tag=f'{pid}_collapsing_header',label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry'):
         with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
             #dpg.set_axis_ticks('{pid}_x', )
@@ -458,6 +459,16 @@ def toggle_mode(sender):
         color_G = 255
         color_B = 255
 
+# callback for Clear
+def clear_parameters(sender):
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    for pid in pids:
+        dpg.delete_item(f'{pid}_collapsing_header')
+        if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
+        if dpg.does_alias_exist(f'{pid}_x'): dpg.remove_alias(f'{pid}_x')
+        if dpg.does_alias_exist(f'{pid}_y'): dpg.remove_alias(f'{pid}_y')
+        if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
+        if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
 
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
@@ -496,6 +507,7 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
                 dpg.add_checkbox(tag='load_preset_clicked_csv', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked_csv', default_value=False, show=False)
+                dpg.add_button(tag='clear_parameters', label='Clear', callback=clear_parameters, enabled=False)
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
                 dpg.add_button(tag='delete_preset_db', label='Delete Preset (db)', enabled=False)
