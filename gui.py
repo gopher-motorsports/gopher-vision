@@ -36,6 +36,9 @@ node.tx_port.port.connect(('1.1.1.1', 80))
 IP = node.tx_port.port.getsockname()[0]
 is_collumn_two = False
 last_coord = (0,0)
+# Use tkinter to get the screen's width and height
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
 parameters = {}
 plot_data = {}
 
@@ -169,8 +172,8 @@ def add_plot(sender, app_data, pid):
 
     # add new plot
     if is_collumn_two:
-        with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+dpg.get_viewport_client_width()*0.5,last_coord[1])):
-            with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+dpg.get_viewport_client_width()*0.5,last_coord[1]+25) ):
+        with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1])):
+            with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1]+25) ):
                 dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
                 dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
                 dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
@@ -468,7 +471,7 @@ with dpg.window(tag='window'):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
                 with dpg.filter_set(tag='parameter_list'):
                     pass
-                        
+       
             with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_text(f'IP: {IP}', color=COLORS['gray'])
                 dpg.add_separator()
