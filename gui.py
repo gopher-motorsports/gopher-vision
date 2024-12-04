@@ -160,8 +160,14 @@ def convert():
 # creates a plot for a loaded GCAN parameter
 def add_plot(sender, app_data, pid):
     global parameters
+    # check if pid is defined in loaded config
     if pid not in parameters:
         return
+    # check if current plot already exists
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    if pid in pids:
+        return
+
     parameter = parameters[pid]
 
     # clean-up in case this plot was removed and re-added
