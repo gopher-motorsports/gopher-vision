@@ -12,6 +12,7 @@ import serial
 import serial.tools.list_ports
 import csv
 import os
+import sys
 
 from lib import gcan
 from lib import gdat
@@ -42,22 +43,35 @@ parameters = {}
 plot_data = {}
 
 # creates a presets folder in current directory if it doesn't exist
-def search_or_create_folder(folder_name):
-    # Get the current directory
-    current_dir = os.getcwd()
+# def search_or_create_folder(folder_name):
+#     # Get the current directory
+#     current_dir = os.getcwd()
 
-    # Iterate through the items in the directory
-    for item in os.listdir(current_dir):
-        # Check if the item is a directory and matches the folder name
-        if os.path.isdir(item) and item == folder_name:
-            return os.path.join(current_dir, item)
+#     # Iterate through the items in the directory
+#     for item in os.listdir(current_dir):
+#         # Check if the item is a directory and matches the folder name
+#         if os.path.isdir(item) and item == folder_name:
+#             return os.path.join(current_dir, item)
     
-    # If the folder doesn't exist, create it
-    folder_path = os.path.join(current_dir, folder_name)
-    os.makedirs(folder_path)
+#     # If the folder doesn't exist, create it
+#     folder_path = os.path.join(current_dir, folder_name)
+#     os.makedirs(folder_path)
 
-    # return the path to the presets folder
-    return folder_path
+#     # return the path to the presets folder
+#     return folder_path
+
+
+# Returns the directory where the script or executable is located.
+def get_executable_dir():
+    if getattr(sys, 'frozen', False):  # Check if running as a PyInstaller bundle
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+global preset_folder_path
+preset_folder_path = os.path.join(get_executable_dir(), "presets")
+if not os.path.exists(preset_folder_path):
+    os.makedirs(preset_folder_path)
 
 # load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
@@ -124,8 +138,8 @@ def load_config(file = None):
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
 
     # presets
-    global preset_folder_path 
-    preset_folder_path = search_or_create_folder("presets")
+    # global preset_folder_path 
+    # preset_folder_path = search_or_create_folder("presets")
     presets = os.listdir(preset_folder_path)
     for preset in presets:
         dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
