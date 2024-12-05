@@ -98,6 +98,7 @@ def load_config(file = None):
     dpg.configure_item('config_path', default_value=path, color=COLORS['green'])
     # enable buttons once a config is loaded
     dpg.configure_item('load_preset', enabled=True)
+    dpg.configure_item('save_preset', enabled=True)
     dpg.configure_item('convert_btn', enabled=True)
     dpg.configure_item('preset_load_db', enabled=True)
     dpg.configure_item('preset_save_db', enabled=True)
@@ -504,9 +505,57 @@ def clear_parameters(sender):
         if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
         if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
 
-# load presets
-def load_preset():
-    print('testing')
+# load preset
+def load_preset(sender, app_data, preset_name):
+    f = open(preset_folder_path + "/" + preset_name)
+    reader = csv.DictReader(f)
+    # add plots for each preset entry
+    for row in reader:
+        pid = int(row['id'])
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+    f.close()
+
+# callback for Save Preset, gets name input
+def save_preset(sender):
+    with dpg.window(label="Preset Name", tag="get_preset_name_window", width=300, height=200):
+        dpg.add_text("Enter preset name: ")
+        dpg.add_input_text(tag="name_input")
+        dpg.add_button(label="Create Preset", callback=save_preset_to_csv)
+
+# save preset to csv file
+def save_preset_to_csv(sender):
+    global parameters
+    plots = []
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    # find currently visible plots
+    for pid in pids:
+        # if dpg.is_item_visible(f'p_plot_{pid}'):
+        y_axis = dpg.get_axis_limits(f'{pid}_y')
+        # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
+        if (y_axis[0] == 0 and y_axis[1] == 0):
+            y_axis[0] = -0.5
+            y_axis[1] = 0.5
+        plots.append({
+            'id': pid,
+            'name': parameters[pid]['name'],
+            'y_min': y_axis[0],
+            'y_max': y_axis[1],
+            'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
+        })
+    # sort by vertical position
+    plots.sort(key=lambda p: p['v_pos'])
+    new_file_name = dpg.get_value("name_input") + ".csv"
+    file_path = os.path.join(preset_folder_path, new_file_name)
+
+    # Save the file
+    with open(file_path, mode='w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['id', 'name', 'y_min', 'y_max'], extrasaction='ignore', lineterminator='\n')
+        writer.writeheader()
+        writer.writerows(plots)
+    print(f"File saved successfully at: {file_path}")
+    dpg.delete_item("get_preset_name_window")
+    dpg.add_selectable(parent='presets_list', label=new_file_name, filter_key=new_file_name, callback=load_preset, user_data=new_file_name)
 
 
 # Use tkinter to get the screen's width and height
@@ -550,6 +599,7 @@ with dpg.window(tag='window'):
 
                 # new offline preset stuff
                 dpg.add_button(tag='load_preset', label='Load Preset +', enabled=False)
+                dpg.add_button(tag='save_preset', label='Save Preset', callback=save_preset, enabled=False)
 
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
