@@ -42,36 +42,18 @@ IP = node.tx_port.port.getsockname()[0]
 parameters = {}
 plot_data = {}
 
-# creates a presets folder in current directory if it doesn't exist
-# def search_or_create_folder(folder_name):
-#     # Get the current directory
-#     current_dir = os.getcwd()
-
-#     # Iterate through the items in the directory
-#     for item in os.listdir(current_dir):
-#         # Check if the item is a directory and matches the folder name
-#         if os.path.isdir(item) and item == folder_name:
-#             return os.path.join(current_dir, item)
-    
-#     # If the folder doesn't exist, create it
-#     folder_path = os.path.join(current_dir, folder_name)
-#     os.makedirs(folder_path)
-
-#     # return the path to the presets folder
-#     return folder_path
-
-
 # Returns the directory where the script or executable is located.
 def get_executable_dir():
-    if getattr(sys, 'frozen', False):  # Check if running as a PyInstaller bundle
+    if getattr(sys, 'frozen', False):  # Running as an executable
         return os.path.dirname(sys.executable)
-    else:
+    else:  # Running as a script
         return os.path.dirname(os.path.abspath(__file__))
 
 global preset_folder_path
 preset_folder_path = os.path.join(get_executable_dir(), "presets")
 if not os.path.exists(preset_folder_path):
     os.makedirs(preset_folder_path)
+print(preset_folder_path)
 
 # load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
