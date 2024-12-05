@@ -99,6 +99,8 @@ def load_config(file = None):
     # enable buttons once a config is loaded
     dpg.configure_item('load_preset', enabled=True)
     dpg.configure_item('save_preset', enabled=True)
+    dpg.configure_item('delete_preset', enabled=True)
+
     dpg.configure_item('convert_btn', enabled=True)
     dpg.configure_item('preset_load_db', enabled=True)
     dpg.configure_item('preset_save_db', enabled=True)
@@ -133,6 +135,9 @@ def load_config(file = None):
     presets = os.listdir(preset_folder_path)
     for preset in presets:
         dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
+    
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
 
     available_presets = db.get_preset_names()
     if available_presets:
@@ -554,9 +559,25 @@ def save_preset_to_csv(sender):
         writer.writeheader()
         writer.writerows(plots)
     print(f"File saved successfully at: {file_path}")
+    dpg.add_selectable(parent='offline_presets_list', label=new_file_name, filter_key=new_file_name, callback=load_preset, user_data=new_file_name)
+    dpg.add_selectable(parent='offline_presets_list_delete', label=new_file_name, filter_key=new_file_name, callback=delete_preset, user_data=new_file_name)
     dpg.delete_item("get_preset_name_window")
-    dpg.add_selectable(parent='presets_list', label=new_file_name, filter_key=new_file_name, callback=load_preset, user_data=new_file_name)
 
+
+# deleting a stored preset file
+def delete_preset(sender, app_data, preset_name):
+    if os.path.exists(preset_folder_path + "/" + preset_name):
+        os.remove(preset_folder_path + "/" + preset_name)
+
+    presets = os.listdir(preset_folder_path)
+    # delete presets list if it already exists, then re-add all presets
+    dpg.delete_item('offline_presets_list', children_only=True)
+    dpg.delete_item('offline_presets_list_delete', children_only=True)
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
+    
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
 
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
@@ -600,6 +621,7 @@ with dpg.window(tag='window'):
                 # new offline preset stuff
                 dpg.add_button(tag='load_preset', label='Load Preset +', enabled=False)
                 dpg.add_button(tag='save_preset', label='Save Preset', callback=save_preset, enabled=False)
+                dpg.add_button(tag='delete_preset', label='Delete Preset +', enabled=False)
 
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
@@ -612,6 +634,11 @@ with dpg.window(tag='window'):
             with dpg.popup('load_preset', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('offline_presets_list', val))
                 with dpg.filter_set(tag='offline_presets_list'):
+                    pass
+
+            with dpg.popup('delete_preset', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('offline_presets_list', val))
+                with dpg.filter_set(tag='offline_presets_list_delete'):
                     pass
 
             with dpg.popup('preset_load_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
