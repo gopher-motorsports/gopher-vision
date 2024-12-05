@@ -11,6 +11,7 @@ import threading
 import serial
 import serial.tools.list_ports
 import csv
+import os
 
 from lib import gcan
 from lib import gdat
@@ -40,6 +41,24 @@ IP = node.tx_port.port.getsockname()[0]
 
 parameters = {}
 plot_data = {}
+
+# creates a presets folder in current directory if it doesn't exist
+def search_or_create_folder(folder_name):
+    # Get the current directory
+    current_dir = os.getcwd()
+
+    # Iterate through the items in the directory
+    for item in os.listdir(current_dir):
+        # Check if the item is a directory and matches the folder name
+        if os.path.isdir(item) and item == folder_name:
+            return os.path.join(current_dir, item)
+    
+    # If the folder doesn't exist, create it
+    folder_path = os.path.join(current_dir, folder_name)
+    os.makedirs(folder_path)
+
+    # return the path to the presets folder
+    return folder_path
 
 # load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
@@ -114,6 +133,9 @@ def load_config(file = None):
 
         for preset in available_presets:
             dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
+
+    # presets
+    preset_folder_path = search_or_create_folder("presets")
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
@@ -514,6 +536,9 @@ with dpg.window(tag='window'):
                 dpg.add_checkbox(tag='load_preset_clicked_csv', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked_csv', default_value=False, show=False)
                 dpg.add_button(tag='clear_parameters', label='Clear', callback=clear_parameters, enabled=False)
+
+
+
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
                 dpg.add_button(tag='delete_preset_db', label='Delete Preset (db)', enabled=False)
