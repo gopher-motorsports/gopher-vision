@@ -142,3 +142,8 @@ Build `GopherVision.exe`:
 ```
 pyinstaller gui.py --onefile --distpath ./ --name GopherVision_vX.X
 ```
+
+Build `GopherVisionMac.app` for mac:
+```
+pyinstaller --onefile --windowed -n GopherVisionMac gui.py
+```
