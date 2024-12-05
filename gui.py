@@ -97,6 +97,7 @@ def load_config(file = None):
     # update loaded config path
     dpg.configure_item('config_path', default_value=path, color=COLORS['green'])
     # enable buttons once a config is loaded
+    dpg.configure_item('load_preset', enabled=True)
     dpg.configure_item('convert_btn', enabled=True)
     dpg.configure_item('preset_load_db', enabled=True)
     dpg.configure_item('preset_save_db', enabled=True)
@@ -125,7 +126,13 @@ def load_config(file = None):
     for parameter in parameters.values():
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
 
-    # create list of presets
+    # presets
+    global preset_folder_path 
+    preset_folder_path = search_or_create_folder("presets")
+    presets = os.listdir(preset_folder_path)
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
+
     available_presets = db.get_preset_names()
     if available_presets:
         for preset in available_presets:
@@ -134,8 +141,7 @@ def load_config(file = None):
         for preset in available_presets:
             dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
 
-    # presets
-    preset_folder_path = search_or_create_folder("presets")
+
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
@@ -498,6 +504,11 @@ def clear_parameters(sender):
         if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
         if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
 
+# load presets
+def load_preset():
+    print('testing')
+
+
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -537,7 +548,8 @@ with dpg.window(tag='window'):
                 dpg.add_checkbox(tag='save_preset_clicked_csv', default_value=False, show=False)
                 dpg.add_button(tag='clear_parameters', label='Clear', callback=clear_parameters, enabled=False)
 
-
+                # new offline preset stuff
+                dpg.add_button(tag='load_preset', label='Load Preset +', enabled=False)
 
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
@@ -546,6 +558,11 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
                 dpg.add_button(tag='settings_btn', label='Settings')
 
+            
+            with dpg.popup('load_preset', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('offline_presets_list', val))
+                with dpg.filter_set(tag='offline_presets_list'):
+                    pass
 
             with dpg.popup('preset_load_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
