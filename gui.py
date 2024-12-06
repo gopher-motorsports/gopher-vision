@@ -11,12 +11,13 @@ import threading
 import serial
 import serial.tools.list_ports
 import csv
+import os
+import sys
 
 from lib import gcan
 from lib import gdat
 from lib import ld
 from lib import live
-import db
 
 root = tk.Tk()
 root.withdraw()
@@ -44,6 +45,17 @@ screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 parameters = {}
 plot_data = {}
+
+# Returns the directory where the script or executable is located.
+def get_executable_dir():
+    if getattr(sys, 'frozen', False):  # Running as an executable
+        return os.path.dirname(sys.executable)
+    else:  # Running as a script
+        return os.path.dirname(os.path.abspath(__file__))
+# path to the existing/created local presets folder
+preset_folder_path = os.path.join(get_executable_dir(), "presets")
+if not os.path.exists(preset_folder_path):
+    os.makedirs(preset_folder_path)
 
 # load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
@@ -82,11 +94,10 @@ def load_config(file = None):
     # update loaded config path
     dpg.configure_item('config_path', default_value=path, color=COLORS['green'])
     # enable buttons once a config is loaded
+    dpg.configure_item('load_preset', enabled=True)
+    dpg.configure_item('save_preset', enabled=True)
+    dpg.configure_item('delete_preset', enabled=True)
     dpg.configure_item('convert_btn', enabled=True)
-    dpg.configure_item('preset_load_db', enabled=True)
-    dpg.configure_item('preset_save_db', enabled=True)
-    dpg.configure_item('preset_load_csv', enabled=True)
-    dpg.configure_item('preset_save_csv', enabled=True)
     dpg.configure_item('clear_parameters', enabled=True)
     # delete parameter table if it already exists
     if dpg.does_item_exist('parameter_table'):
@@ -110,14 +121,17 @@ def load_config(file = None):
     for parameter in parameters.values():
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
 
-    # create list of presets
-    available_presets = db.get_preset_names()
-    if available_presets:
-        for preset in available_presets:
-            dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
+    # presets
+    # global preset_folder_path 
+    # preset_folder_path = search_or_create_folder("presets")
+    presets = os.listdir(preset_folder_path)
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
+    
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
 
-        for preset in available_presets:
-            dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
+
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
@@ -203,111 +217,6 @@ def add_plot(sender, app_data, pid):
                 dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
         is_collumn_two = True
         last_coord = (0,last_coord[1]+175)
-
-# load presets from database
-def load_preset_db(sender, app_data, preset_name):
-    preset_info = db.get_preset_info(preset_name)
-    num_presets = len(preset_info[0]['id'])
-
-    for i in range(num_presets):
-        pid = preset_info[0]['id'][i]
-        y_min = preset_info[0]['y_min'][i]
-        y_max = preset_info[0]['y_max'][i]
-        add_plot(None, None, pid)
-        dpg.set_axis_limits(f'{pid}_y', float(y_min), float(y_max))
-
-# delete a preset from the database
-def delete_preset_db(sender, app_data, preset_name):
-    db.delele_preset(preset_name)
-
-    available_presets = db.get_preset_names()
-    # delete presets list if it already exists, then re-add all presets
-    dpg.delete_item('presets_list', children_only=True)
-    dpg.delete_item('presets_list_delete', children_only=True)
-    for preset in available_presets:
-        dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
-
-    for preset in available_presets:
-        dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
-
-
-# load presets from csv file
-def load_preset_csv(file=None):
-    if file:
-        f = open(file)
-    else:
-        f = filedialog.askopenfile(
-            title='Load GopherVision preset',
-            filetypes=[('CSV', '*.csv')])
-
-    reader = csv.DictReader(f)
-    # add plots for each preset entry
-    for row in reader:
-        pid = int(row['id'])
-        add_plot(None, None, pid)
-        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
-    f.close()
-
-# creates window that asks for preset name
-def save_preset_db(sender):
-    with dpg.window(label="Preset Name", tag="get_preset_name_window", width=300, height=200):
-        dpg.add_text("Enter preset name: ")
-        dpg.add_input_text(tag="name_input")
-        dpg.add_button(label="Create Preset", callback=upload_preset_db)
-
-# creates new preset and upload to db
-def upload_preset_db(sender):
-    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
-    pnames = []
-    py_mins = []
-    py_maxes = []
-    new_preset_name = dpg.get_value("name_input")
-    for pid in pids:
-        y_axis = dpg.get_axis_limits(f'{pid}_y')
-        pnames.append(parameters[pid]['name'])
-        # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
-        if (y_axis[0] == 0 and y_axis[1] == 0):
-            py_mins.append(-0.5)
-            py_maxes.append(0.5)
-        else:
-            py_mins.append(y_axis[0])
-            py_maxes.append(y_axis[1])
-    db.upload_preset(new_preset_name,pids,pnames,py_mins,py_maxes)
-    dpg.add_selectable(parent='presets_list', label=new_preset_name, filter_key=new_preset_name, callback=load_preset_db, user_data=new_preset_name)
-    dpg.add_selectable(parent='presets_list_delete', label=new_preset_name, filter_key=new_preset_name, callback=delete_preset_db, user_data=new_preset_name)
-    dpg.delete_item("get_preset_name_window")
-
-# save preset to csv file
-def save_preset_csv():
-    global parameters
-    plots = []
-    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
-    # find currently visible plots
-    for pid in pids:
-        # if dpg.is_item_visible(f'p_plot_{pid}'):
-        y_axis = dpg.get_axis_limits(f'{pid}_y')
-        # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
-        if (y_axis[0] == 0 and y_axis[1] == 0):
-            y_axis[0] = -0.5
-            y_axis[1] = 0.5
-        plots.append({
-            'id': pid,
-            'name': parameters[pid]['name'],
-            'y_min': y_axis[0],
-            'y_max': y_axis[1],
-            'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
-        })
-    # sort by vertical position
-    plots.sort(key=lambda p: p['v_pos'])
-
-    with filedialog.asksaveasfile(
-        title='Save GopherVision preset',
-        filetypes=[('CSV', '*.csv')],
-        defaultextension='csv'
-    ) as f:
-        writer = csv.DictWriter(f, fieldnames=['id', 'name', 'y_min', 'y_max'], extrasaction='ignore', lineterminator='\n')
-        writer.writeheader()
-        writer.writerows(plots)
 
 def start_recording(sender, _):
     global node
@@ -432,6 +341,23 @@ def host_trackside():
         dpg.stop_dearpygui() # TODO: consider not killing gui, just displaying message?
         exit()
 
+# load presets from csv file
+def load_preset_csv(file=None):
+    if file:
+        f = open(file)
+    else:
+        f = filedialog.askopenfile(
+            title='Load GopherVision preset',
+            filetypes=[('CSV', '*.csv')])
+
+    reader = csv.DictReader(f)
+    # add plots for each preset entry
+    for row in reader:
+        pid = int(row['id'])
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+    f.close()
+
 def trackside_connect(sender, _):
     global client, connected
     if connected: return
@@ -494,6 +420,75 @@ def clear_parameters(sender):
         if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
         if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
 
+# load preset
+def load_preset(sender, app_data, preset_name):
+    f = open(preset_folder_path + "/" + preset_name)
+    reader = csv.DictReader(f)
+    # add plots for each preset entry
+    for row in reader:
+        pid = int(row['id'])
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+    f.close()
+
+# callback for Save Preset, gets name input
+def save_preset(sender):
+    with dpg.window(label="Preset Name", tag="get_preset_name_window", width=300, height=200):
+        dpg.add_text("Enter preset name: ")
+        dpg.add_input_text(tag="name_input")
+        dpg.add_button(label="Create Preset", callback=save_preset_to_csv)
+
+# save preset to csv file
+def save_preset_to_csv(sender):
+    global parameters
+    plots = []
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    # find currently visible plots
+    for pid in pids:
+        # if dpg.is_item_visible(f'p_plot_{pid}'):
+        y_axis = dpg.get_axis_limits(f'{pid}_y')
+        # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
+        if (y_axis[0] == 0 and y_axis[1] == 0):
+            y_axis[0] = -0.5
+            y_axis[1] = 0.5
+        plots.append({
+            'id': pid,
+            'name': parameters[pid]['name'],
+            'y_min': y_axis[0],
+            'y_max': y_axis[1],
+            'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
+        })
+    # sort by vertical position
+    plots.sort(key=lambda p: p['v_pos'])
+    new_file_name = dpg.get_value("name_input") + ".csv"
+    file_path = os.path.join(preset_folder_path, new_file_name)
+
+    # Save the file
+    with open(file_path, mode='w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=['id', 'name', 'y_min', 'y_max'], extrasaction='ignore', lineterminator='\n')
+        writer.writeheader()
+        writer.writerows(plots)
+    print(f"File saved successfully at: {file_path}")
+    dpg.add_selectable(parent='offline_presets_list', label=new_file_name, filter_key=new_file_name, callback=load_preset, user_data=new_file_name)
+    dpg.add_selectable(parent='offline_presets_list_delete', label=new_file_name, filter_key=new_file_name, callback=delete_preset, user_data=new_file_name)
+    dpg.delete_item("get_preset_name_window")
+
+
+# deleting a stored preset file
+def delete_preset(sender, app_data, preset_name):
+    if os.path.exists(preset_folder_path + "/" + preset_name):
+        os.remove(preset_folder_path + "/" + preset_name)
+
+    presets = os.listdir(preset_folder_path)
+    # delete presets list if it already exists, then re-add all presets
+    dpg.delete_item('offline_presets_list', children_only=True)
+    dpg.delete_item('offline_presets_list_delete', children_only=True)
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
+    
+    for preset in presets:
+        dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
+
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -529,32 +524,25 @@ with dpg.window(tag='window'):
             with dpg.group(horizontal=True):
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
                 dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
-                dpg.add_checkbox(tag='load_preset_clicked_csv', default_value=False, show=False)
-                dpg.add_checkbox(tag='save_preset_clicked_csv', default_value=False, show=False)
                 dpg.add_button(tag='clear_parameters', label='Clear', callback=clear_parameters, enabled=False)
-                dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
-                dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
-                dpg.add_button(tag='delete_preset_db', label='Delete Preset (db)', enabled=False)
-                dpg.add_button(tag='preset_load_csv', label='Load Preset (csv)', callback=lambda: dpg.set_value('load_preset_clicked_csv', True), enabled=False)
-                dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
+                dpg.add_button(tag='load_preset', label='Load Preset +', enabled=False)
+                dpg.add_button(tag='save_preset', label='Save Preset', callback=save_preset, enabled=False)
+                dpg.add_button(tag='delete_preset', label='Delete Preset +', enabled=False)
                 dpg.add_button(tag='settings_btn', label='Settings')
 
-
-            with dpg.popup('preset_load_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
-                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
-                with dpg.filter_set(tag='presets_list'):
+            
+            with dpg.popup('load_preset', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('offline_presets_list', val))
+                with dpg.filter_set(tag='offline_presets_list'):
                     pass
 
-            with dpg.popup('delete_preset_db', no_move=True, mousebutton=dpg.mvMouseButton_Left):
-                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('presets_list', val))
-                with dpg.filter_set(tag='presets_list_delete'):
+            with dpg.popup('delete_preset', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('offline_presets_list', val))
+                with dpg.filter_set(tag='offline_presets_list_delete'):
                     pass
 
                 dpg.add_checkbox(tag='load_preset_clicked', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked', default_value=False, show=False)
-                # dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
-                # dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
-                #dpg.add_button(tag='settings_btn', label='Settings')
 
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
@@ -664,10 +652,6 @@ while dpg.is_dearpygui_running():
     if dpg.get_value('convert_clicked'):
         dpg.set_value('convert_clicked', False)
         convert()
-
-    if dpg.get_value('save_preset_clicked_csv'):
-        dpg.set_value('save_preset_clicked_csv', False)
-        save_preset_csv()
 
     if dpg.get_value('load_preset_clicked_csv'):
         dpg.set_value('load_preset_clicked_csv', False)
