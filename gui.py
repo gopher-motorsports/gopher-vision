@@ -186,8 +186,8 @@ def add_plot(sender, app_data, pid):
 
     # add new plot
     if is_collumn_two:
-        with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1])):
-            with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1] + 23) ):
+        with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 120)):
+            with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 97)):
                 dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
                 dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
                 dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
@@ -195,7 +195,7 @@ def add_plot(sender, app_data, pid):
         is_collumn_two = False
         last_coord = (last_coord[0]+400,last_coord[1])
     else:
-        with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(0,last_coord[1]+175)):
+        with dpg.collapsing_header(label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(0,last_coord[1] + 55)):
             with dpg.plot(tag=f'p_plot_{pid}', width=(screen_width/2) - 8, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
                 dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
                 dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
