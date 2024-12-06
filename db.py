@@ -7,25 +7,37 @@ supabase: Client = create_client(url, key)
 
 # creates a preset in the database
 def upload_preset(preset_name, id_lst, pname_lst, ymin_lst, ymax_lst):
-  supabase.table("presets").insert({
-  "preset_name": preset_name,
-  "id": id_lst,
-  "param_name": pname_lst,
-  "y_min": ymin_lst,
-  "y_max": ymax_lst
-}).execute()
+  try:
+    supabase.table("presets").insert({
+    "preset_name": preset_name,
+    "id": id_lst,
+    "param_name": pname_lst,
+    "y_min": ymin_lst,
+    "y_max": ymax_lst
+    }).execute()
+  except:
+    print("Error accessing database")
 
 # returns a list of existing presets in the database
 def get_preset_names():
-  names = supabase.table("presets").select("preset_name").execute().data
-  values_list = [item['preset_name'] for item in names]
-  return values_list
+  try:
+    names = supabase.table("presets").select("preset_name").execute().data
+    values_list = [item['preset_name'] for item in names]
+    return values_list
+  except:
+    print("Error accessing database")
 
 # returns data of requested preset
 def get_preset_info(preset_name):
-  preset_info = supabase.table("presets").select().eq("preset_name", preset_name).execute().data
-  return preset_info
+  try:
+    preset_info = supabase.table("presets").select().eq("preset_name", preset_name).execute().data
+    return preset_info
+  except:
+    print("Error accessing database")
 
 # delete a preset from the database
 def delele_preset(preset_name):
-  response = supabase.table('presets').delete().eq('preset_name', preset_name).execute()
+  try:
+    response = supabase.table('presets').delete().eq('preset_name', preset_name).execute()
+  except:
+    print("Error accessing database")

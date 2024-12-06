@@ -1,3 +1,4 @@
+from sys import argv
 import dearpygui.dearpygui as dpg
 from dearpygui_ext.themes import create_theme_imgui_light
 from dearpygui_ext.themes import create_theme_imgui_dark
@@ -29,6 +30,8 @@ COLORS = {
 PLOT_RATE_HZ = 100
 PLOT_LENGTH_S = 5
 
+T_HOSTNAME = "GopherTrackPC"
+
 node = live.Node()
 # connect to a DNS server to force socket to bind to a port
 node.tx_port.open_socket()
@@ -44,27 +47,30 @@ plot_data = {}
 
 # load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
-def load_config():
+def load_config(file = None):
     global node
     global parameters
     global plot_data
     # open file dialog
     # root = tk.Tk()
     # root.withdraw()
-    path = filedialog.askopenfilename( # Gives trace trap
-        title='Open GopherCAN configuration',
-        filetypes=[('YAML', '*.yaml')]
-    ) 
-    if not path:
-        return
-    
+    if file:
+        path = file
+    else:
+        path = filedialog.askopenfilename( # Gives trace trap
+            title='Open GopherCAN configuration',
+            filetypes=[('YAML', '*.yaml')]
+        )
+        if not path:
+            return
+
     # load GopherCAN parameters
     try:
         parameters = gcan.get_params(gcan.load_path(path))
     except:
         print(f'ERROR: failed to collect parameters from "{path}"')
         return
-    
+
     node.set_parameters(parameters)
     plot_data = {
         id: {
@@ -81,6 +87,7 @@ def load_config():
     dpg.configure_item('preset_save_db', enabled=True)
     dpg.configure_item('preset_load_csv', enabled=True)
     dpg.configure_item('preset_save_csv', enabled=True)
+    dpg.configure_item('clear_parameters', enabled=True)
     # delete parameter table if it already exists
     if dpg.does_item_exist('parameter_table'):
         dpg.delete_item('parameter_table')
@@ -105,11 +112,12 @@ def load_config():
 
     # create list of presets
     available_presets = db.get_preset_names()
-    for preset in available_presets:
-        dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
+    if available_presets:
+        for preset in available_presets:
+            dpg.add_selectable(parent='presets_list', label=preset, filter_key=preset, callback=load_preset_db, user_data=preset)
 
-    for preset in available_presets:
-        dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
+        for preset in available_presets:
+            dpg.add_selectable(parent='presets_list_delete', label=preset, filter_key=preset, callback=delete_preset_db, user_data=preset)
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
@@ -159,8 +167,14 @@ def add_plot(sender, app_data, pid):
     global is_collumn_two
     global parameters
     global last_coord
+    # check if pid is defined in loaded config
     if pid not in parameters:
         return
+    # check if current plot already exists
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    if pid in pids:
+        return
+
     parameter = parameters[pid]
 
     # clean-up in case this plot was removed and re-added
@@ -218,17 +232,21 @@ def delete_preset_db(sender, app_data, preset_name):
 
 
 # load presets from csv file
-def load_preset_csv():
-    with filedialog.askopenfile(
-        title='Load GopherVision preset',
-        filetypes=[('CSV', '*.csv')]
-    ) as f:
-        reader = csv.DictReader(f)
-        # add plots for each preset entry
-        for row in reader:
-            pid = int(row['id'])
-            add_plot(None, None, pid)
-            dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+def load_preset_csv(file=None):
+    if file:
+        f = open(file)
+    else:
+        f = filedialog.askopenfile(
+            title='Load GopherVision preset',
+            filetypes=[('CSV', '*.csv')])
+
+    reader = csv.DictReader(f)
+    # add plots for each preset entry
+    for row in reader:
+        pid = int(row['id'])
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+    f.close()
 
 # creates window that asks for preset name
 def save_preset_db(sender):
@@ -269,7 +287,7 @@ def save_preset_csv():
         # if dpg.is_item_visible(f'p_plot_{pid}'):
         y_axis = dpg.get_axis_limits(f'{pid}_y')
         # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
-        if (y_axis[0] == 0 and y_axis[1] == 0): 
+        if (y_axis[0] == 0 and y_axis[1] == 0):
             y_axis[0] = -0.5
             y_axis[1] = 0.5
         plots.append({
@@ -305,7 +323,7 @@ def start_recording(sender, _):
 
     if not path:
         return
-    
+
     node.open_record(path)
     dpg.configure_item('record_path', default_value=path, color=COLORS['green'])
 
@@ -357,10 +375,11 @@ def set_port_serial(sender, port_name):
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
 # callback for  "Set" button when entering a network port
-def set_port_socket(sender, _):
+def set_port_socket(sender, _, host = None, port = None):
     global node
-    host = dpg.get_value('port_socket_host')
-    port = dpg.get_value('port_socket_port')
+    if host is None:
+        host = dpg.get_value('port_socket_host')
+        port = dpg.get_value('port_socket_port')
     try:
         dpg.configure_item('port_status', default_value=f'opening {host}:{port} ...', color=COLORS['gray'])
         node.rx_port.bind_socket(host, port)
@@ -369,20 +388,73 @@ def set_port_socket(sender, _):
         print(err)
         dpg.configure_item('port_status', default_value='No port open', color=COLORS['red'])
 
-def add_client(sender, _):
-    global node
-    host = dpg.get_value('client_add_host')
-    port = dpg.get_value('client_add_port')
-    node.add_client(host, port)
-    dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
+import socket # Imported here because I would like to move this function out of gui.py if possible
+client = socket.socket()
+connected = False
 
-def remove_client(sender, _):
+def manage_client(client_socket, addr):
     global node
-    host = dpg.get_value('client_add_host')
-    port = dpg.get_value('client_add_port')
-    node.remove_client(host, port)
-    dpg.configure_item('client_list', items=[f'{client[0]} : {client[1]}' for client in node.clients])
-    
+    try:
+        while True:
+            request = client_socket.recv(1024).decode("utf-8")
+            if request.lower() == "close":
+                client_socket.send("closed".encode("utf-8"))
+                break
+            print(f"Received: {request}")
+            node.add_client(addr[0], 5002)
+            print("Now sending to: ")
+            print(node.clients)
+            client_socket.send("accepted".encode("utf-8"))
+    except Exception as e:
+        print(f"Error when hanlding client: {e}")
+    finally:
+        client_socket.close()
+        print(f"Connection to client ({addr[0]}:{addr[1]}) closed")
+        node.remove_client(addr[0], 5002)
+        print("Now sending to: ")
+        print(node.clients)
+
+def host_trackside():
+    try:
+        # Use default TCP so connection request doesn't get missed
+        server = socket.socket()
+        server.bind(('', 5001))
+        server.listen(5)
+        print("Listening for connection requests")
+        while True:
+            client_socket, addr = server.accept()
+            print("Got connection from", addr)
+            thread = threading.Thread(target=manage_client, args=(client_socket, addr,))
+            thread.start()
+    except Exception as e:
+        print("Could not host server")
+        print(f"Error: {e}")
+        dpg.stop_dearpygui() # TODO: consider not killing gui, just displaying message?
+        exit()
+
+def trackside_connect(sender, _):
+    global client, connected
+    if connected: return
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    host = dpg.get_value('trackside_hostname')
+    try:
+        client.connect((host, 5001))
+    except:
+        print("Error connecting to host")
+        dpg.configure_item('port_status', default_value='Connection failed', color=COLORS['red'])
+        return
+
+    client.send("connect".encode("utf-8")[:1024])
+    response = client.recv(1024).decode("utf-8")
+
+    if response == "accepted":
+        # Listen for data over UDP
+        set_port_socket(0, 0, IP, '5002')
+        connected = True
+    else:
+        print(f"Received: {response}")
+
+
 toggle = 0 # var for switching themes
 color_R = 255
 color_G = 255
@@ -411,14 +483,30 @@ def toggle_mode(sender):
         color_G = 255
         color_B = 255
 
+# callback for Clear
+def clear_parameters(sender):
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    for pid in pids:
+        dpg.delete_item(f'{pid}_collapsing_header')
+        if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
+        if dpg.does_alias_exist(f'{pid}_x'): dpg.remove_alias(f'{pid}_x')
+        if dpg.does_alias_exist(f'{pid}_y'): dpg.remove_alias(f'{pid}_y')
+        if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
+        if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
+
+# Use tkinter to get the screen's width and height
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+
 dpg.create_context()
-dpg.create_viewport(title='GopherVision', width=800, height=600)
+dpg.create_viewport(title='GopherVision', width=screen_width, height=screen_height)
 dpg.set_viewport_vsync(True)
+dpg.set_viewport_pos([0,0])
 
 with dpg.window(tag='window'):
     dpg.set_primary_window('window', True)
 
-    with dpg.tab_bar():
+    with dpg.tab_bar(tag='tab-bar'):
         with dpg.tab(label='GopherCAN', tag='tab-gophercan'):
             with dpg.group(horizontal=True):
                 dpg.add_text('Load a GopherCAN configuration (.yaml):')
@@ -443,11 +531,12 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
                 dpg.add_checkbox(tag='load_preset_clicked_csv', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked_csv', default_value=False, show=False)
-                dpg.add_button(tag='preset_load_csv', label='Load Preset (csv)', callback=lambda: dpg.set_value('load_preset_clicked_csv', True), enabled=False)
-                dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
+                dpg.add_button(tag='clear_parameters', label='Clear', callback=clear_parameters, enabled=False)
                 dpg.add_button(tag='preset_load_db', label='Load Preset + (db)', enabled=False)
                 dpg.add_button(tag='preset_save_db', label='Save Preset (db)', callback=save_preset_db, enabled=False)
                 dpg.add_button(tag='delete_preset_db', label='Delete Preset (db)', enabled=False)
+                dpg.add_button(tag='preset_load_csv', label='Load Preset (csv)', callback=lambda: dpg.set_value('load_preset_clicked_csv', True), enabled=False)
+                dpg.add_button(tag='preset_save_csv', label='Save Preset (csv)', callback=lambda: dpg.set_value('save_preset_clicked_csv', True), enabled=False)
                 dpg.add_button(tag='settings_btn', label='Settings')
 
 
@@ -463,8 +552,8 @@ with dpg.window(tag='window'):
 
                 dpg.add_checkbox(tag='load_preset_clicked', default_value=False, show=False)
                 dpg.add_checkbox(tag='save_preset_clicked', default_value=False, show=False)
-                dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
-                dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
+                # dpg.add_button(tag='preset_load', label='Load Preset', callback=lambda: dpg.set_value('load_preset_clicked', True), enabled=False)
+                # dpg.add_button(tag='preset_save', label='Save Preset', callback=lambda: dpg.set_value('save_preset_clicked', True), enabled=False)
                 #dpg.add_button(tag='settings_btn', label='Settings')
 
             with dpg.popup('add_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
@@ -503,16 +592,15 @@ with dpg.window(tag='window'):
                     dpg.add_button(tag='port_socket_set', label='Set', callback=set_port_socket, show=False)
                 # displays port status
                 dpg.add_text('No port open', tag='port_status', color=COLORS['red'])
-                dpg.add_separator()
 
-                # list of clients to forward data to
-                dpg.add_text('Forward data to:')
-                dpg.add_listbox(tag='client_list', items=[])
-                with dpg.group(horizontal=True):
-                    dpg.add_input_text(tag='client_add_host', hint='host', width=100)
-                    dpg.add_input_text(tag='client_add_port', hint='port', width=100)
-                    dpg.add_button(label='Add', callback=add_client)
-                    dpg.add_button(label='Remove', callback=remove_client)
+                # display trackside connect button if not the host
+                if len(argv) < 2 or argv[1] != "host":
+                    dpg.add_separator()
+                    dpg.add_text('Trackside Server:')
+                    with dpg.group(horizontal=True):
+                        dpg.add_input_text(tag='trackside_hostname', hint='host', default_value=T_HOSTNAME, width=150)
+                        dpg.add_button(label='Connect', callback=trackside_connect)
+
 
 dpg.setup_dearpygui()
 dpg.show_viewport()
@@ -523,7 +611,26 @@ def change_theme():
     with dpg.theme(tag="plot_theme"):
         with dpg.theme_component(dpg.mvLineSeries):
             dpg.add_theme_color(dpg.mvPlotCol_Line, (color_R, color_G, color_B), category=dpg.mvThemeCat_Plots)
+            
 change_theme() # initialize theme
+
+
+# Start hosting if called from cmd with argument host (python gui.py host yaml_config csv port)
+if len(argv) > 1 and argv[1] == "host":
+    if len(argv) > 2:
+        load_config(argv[2])  # set CAN config
+        if len(argv) > 3:
+            load_preset_csv(argv[3])  # set csv
+            if len(argv) > 4:
+                set_port_serial(0, argv[4])  # set port
+        dpg.set_value('tab-bar', 'tab-telemetry')  # set tab
+    # change_theme() # light mode TODO: Doesn't work
+    dpg.toggle_viewport_fullscreen()  # fullscreen
+
+    # Open server to listen for connection requests
+    print("starting server")
+    threading.Thread(target=host_trackside, daemon=True).start()
+
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
     global node

@@ -1,3 +1,5 @@
+Go4-24e Config: https://github.com/gopher-motorsports/gophercan-lib/blob/main/network_autogen%2Fconfigs%2Fgo4-24e.yaml
+
 **GopherVision** is a collection of Python utilities for interacting with Gopher Motorsports data.
 
 ## Quickstart
@@ -139,4 +141,9 @@ This script includes functions that interact with the database storing presets.
 Build `GopherVision.exe`:
 ```
 pyinstaller gui.py --onefile --distpath ./ --name GopherVision_vX.X
+```
+
+Build `GopherVisionMac.app` for mac:
+```
+pyinstaller --onefile --windowed -n GopherVisionMac gui.py
 ```
