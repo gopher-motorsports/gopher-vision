@@ -48,12 +48,10 @@ def get_executable_dir():
         return os.path.dirname(sys.executable)
     else:  # Running as a script
         return os.path.dirname(os.path.abspath(__file__))
-
-global preset_folder_path
+# path to the existing/created local presets folder
 preset_folder_path = os.path.join(get_executable_dir(), "presets")
 if not os.path.exists(preset_folder_path):
     os.makedirs(preset_folder_path)
-print(preset_folder_path)
 
 # load_config gets called when "Browse" button in GopherCAN tab
 # opens a file dialog to load a YAML config
