@@ -121,9 +121,7 @@ def load_config(file = None):
     for parameter in parameters.values():
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
 
-    # presets
-    # global preset_folder_path 
-    # preset_folder_path = search_or_create_folder("presets")
+    # add existing presets to filter-set for load and delete
     presets = os.listdir(preset_folder_path)
     for preset in presets:
         dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
