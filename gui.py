@@ -42,6 +42,8 @@ is_collumn_two = False
 last_coord = (0,0)
 is_custum_parameter_1_empty = True
 is_custum_parameter_2_empty = True
+custom_parameters_list = []
+operator = ''
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -496,11 +498,11 @@ def delete_preset(sender, app_data, preset_name):
 
 # callback for math
 def math_channels(sender):
-    print('testing')
     global is_custum_parameter_1_empty
     global is_custum_parameter_2_empty
     with dpg.window(label="Create Custum Paramter", tag="math_channel_window", width=300, height=300):
         dpg.add_button(tag='choose_parameters_btn',label="Choose parameters +")
+        dpg.add_button(tag='choose_operator_btn', label="Choose operator +")
 
         with dpg.popup('choose_parameters_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
             dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('math_channel_parameter_list', val))
@@ -509,27 +511,32 @@ def math_channels(sender):
         for parameter in parameters.values():
             dpg.add_selectable(parent='math_channel_parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=save_parameter_name, user_data=parameter['id'])
         
-        with dpg.group(tag='math_parameter_1'):
-            dpg.add_text('Parameter 1: ', color=COLORS['gray'])
-        with dpg.group(tag='math_parameter_2'):
-            dpg.add_text('Parameter 2: ', color=COLORS['gray'])
+        with dpg.popup('choose_operator_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+            dpg.add_input_text(hint='Operator', callback=lambda _, val: dpg.set_value('math_channel_operators', val))
+            with dpg.filter_set(tag='math_channel_operators'):
+                dpg.add_selectable(parent='math_channel_operators', label='+', filter_key='+', callback=save_operator, user_data='+')
+                dpg.add_selectable(parent='math_channel_operators', label='-', filter_key='-', callback=save_operator, user_data='-')
+                dpg.add_selectable(parent='math_channel_operators', label='/', filter_key='/', callback=save_operator, user_data='/')
+                dpg.add_selectable(parent='math_channel_operators', label='*', filter_key='*', callback=save_operator, user_data='*')
 
-        # dpg.add_text('testing', parent='math_parameter_1', color=COLORS['gray'])
+        with dpg.group(tag='chosen_custom_parameters'):
+            dpg.add_text('SELECTED PARAMETERS: ', color=COLORS['red'])
+        with dpg.group(tag='math_operator'):
+            dpg.add_text('OPERATOR: ', color=COLORS['red'])
         
         dpg.add_text("Enter custum parameter name: ")
         dpg.add_input_text(tag="new_custum_parameter_name")
         dpg.add_button(label="Create Custum Paramter", callback=placeholder)
 
-def save_parameter_name(sender):
-    global is_custum_parameter_1_empty
-    global is_custum_parameter_2_empty
-    print(sender)
-    if (is_custum_parameter_1_empty == True):
-        dpg.add_text(sender, parent='math_parameter_1', color=COLORS['gray'])
-        is_custum_parameter_1_empty = False
-    elif(is_custum_parameter_2_empty == True):
-        dpg.add_text(sender, parent='math_parameter_2', color=COLORS['gray'])
-        is_custum_parameter_2_empty = False
+def save_parameter_name(sender, app_data, pid):
+    global custom_parameters_list
+    custom_parameters_list.append(parameters[pid]['name'])
+    dpg.add_text(parameters[pid]['name'], parent='chosen_custom_parameters', color=COLORS['red'])
+
+def save_operator(sender, app_data, op):
+    global operator
+    operator = op
+    dpg.add_text(op, parent='math_operator', color=COLORS['red'])
 
 def placeholder(sender):
     print()
