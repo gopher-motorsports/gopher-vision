@@ -6,9 +6,10 @@ Go4-24e Config: https://github.com/gopher-motorsports/gophercan-lib/blob/main/ne
 
 _Just want the GUI?_ Vist the [Releases](https://github.com/gopher-motorsports/gopher-vision/releases) page to download the latest version of the desktop app. You can find `GopherVision.exe` under the "Assets" dropdown.
 
-![](img/gcan.png)
-![](img/parser.png)
-![](img/telemetry.png)
+![light_mode](https://github.com/user-attachments/assets/be0ddc4c-3749-44aa-8149-6f4ae0903200)
+![dark_mode](https://github.com/user-attachments/assets/89a967b8-4cf2-4aa3-bb7d-41981d254498)
+![settings](https://github.com/user-attachments/assets/8701c74a-a8e9-427d-ab5e-70c2b20f7195)
+
 
 ## Installation
 
