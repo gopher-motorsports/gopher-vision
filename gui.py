@@ -40,6 +40,8 @@ node.tx_port.port.connect(('1.1.1.1', 80))
 IP = node.tx_port.port.getsockname()[0]
 is_collumn_two = False
 last_coord = (0,0)
+is_custum_parameter_1_empty = True
+is_custum_parameter_2_empty = True
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -99,6 +101,7 @@ def load_config(file = None):
     dpg.configure_item('delete_preset', enabled=True)
     dpg.configure_item('convert_btn', enabled=True)
     dpg.configure_item('clear_parameters', enabled=True)
+    dpg.configure_item('math_channels', enabled=True)
     # delete parameter table if it already exists
     if dpg.does_item_exist('parameter_table'):
         dpg.delete_item('parameter_table')
@@ -476,7 +479,6 @@ def save_preset_to_csv(sender):
     dpg.add_selectable(parent='offline_presets_list_delete', label=new_file_name, filter_key=new_file_name, callback=delete_preset, user_data=new_file_name)
     dpg.delete_item("get_preset_name_window")
 
-
 # deleting a stored preset file
 def delete_preset(sender, app_data, preset_name):
     if os.path.exists(preset_folder_path + "/" + preset_name):
@@ -491,6 +493,46 @@ def delete_preset(sender, app_data, preset_name):
     
     for preset in presets:
         dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
+
+# callback for math
+def math_channels(sender):
+    print('testing')
+    global is_custum_parameter_1_empty
+    global is_custum_parameter_2_empty
+    with dpg.window(label="Create Custum Paramter", tag="math_channel_window", width=300, height=300):
+        dpg.add_button(tag='choose_parameters_btn',label="Choose parameters +")
+
+        with dpg.popup('choose_parameters_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+            dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('math_channel_parameter_list', val))
+            with dpg.filter_set(tag='math_channel_parameter_list'):
+                pass
+        for parameter in parameters.values():
+            dpg.add_selectable(parent='math_channel_parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=save_parameter_name, user_data=parameter['id'])
+        
+        with dpg.group(tag='math_parameter_1'):
+            dpg.add_text('Parameter 1: ', color=COLORS['gray'])
+        with dpg.group(tag='math_parameter_2'):
+            dpg.add_text('Parameter 2: ', color=COLORS['gray'])
+
+        # dpg.add_text('testing', parent='math_parameter_1', color=COLORS['gray'])
+        
+        dpg.add_text("Enter custum parameter name: ")
+        dpg.add_input_text(tag="new_custum_parameter_name")
+        dpg.add_button(label="Create Custum Paramter", callback=placeholder)
+
+def save_parameter_name(sender):
+    global is_custum_parameter_1_empty
+    global is_custum_parameter_2_empty
+    print(sender)
+    if (is_custum_parameter_1_empty == True):
+        dpg.add_text(sender, parent='math_parameter_1', color=COLORS['gray'])
+        is_custum_parameter_1_empty = False
+    elif(is_custum_parameter_2_empty == True):
+        dpg.add_text(sender, parent='math_parameter_2', color=COLORS['gray'])
+        is_custum_parameter_2_empty = False
+
+def placeholder(sender):
+    print()
 
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
@@ -528,6 +570,7 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
                 dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
                 dpg.add_button(tag='clear_parameters', label='Clear', callback=clear_parameters, enabled=False)
+                dpg.add_button(tag='math_channels', label='Math', callback=math_channels, enabled=False)
                 dpg.add_button(tag='load_preset', label='Load Preset +', enabled=False)
                 dpg.add_button(tag='save_preset', label='Save Preset', callback=save_preset, enabled=False)
                 dpg.add_button(tag='delete_preset', label='Delete Preset +', enabled=False)
