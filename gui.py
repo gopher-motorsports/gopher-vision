@@ -25,7 +25,9 @@ root.withdraw()
 COLORS = {
     'red': (231, 76, 60),
     'green': (45, 245, 120),
-    'gray': (255, 255, 255, 128)
+    'gray': (255, 255, 255, 128),
+    'brightred': (255,0,0),
+    'darkred': (153,0,0)
 }
 
 PLOT_RATE_HZ = 100
@@ -43,13 +45,18 @@ last_coord = (0,0)
 is_custum_parameter_1_empty = True
 is_custum_parameter_2_empty = True
 custom_parameters_list = []
+math_channels_dict = {
+    'Wheel RPM': [['Electrical RPM', '/', '10'], 'NA'],
+    'Average Wheel Speeds': [['Wheel Speed FL', '+', 'Wheel Speed FR', ')', '/', '2'], 'NA'],
+    'Total VBat': [['VBat Channel 0 Current', '+', 'VBat Channel 1 Current', '+', 'VBat Channel 2 Current', '+', 'VBat Channel 3 Current', 
+                    '+', 'VBat Channel 4 Current', '+', 'VBat Channel 5 Current', '+', 'VBat Channel 6 Current'], 'V']
+}
 operator = ''
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 parameters = {}
 plot_data = {}
-
 # Returns the directory where the script or executable is located.
 def get_executable_dir():
     if getattr(sys, 'frozen', False):  # Running as an executable
@@ -67,6 +74,7 @@ def load_config(file = None):
     global node
     global parameters
     global plot_data
+    global math_channels_dict
     # open file dialog
     # root = tk.Tk()
     # root.withdraw()
@@ -103,7 +111,8 @@ def load_config(file = None):
     dpg.configure_item('delete_preset', enabled=True)
     dpg.configure_item('convert_btn', enabled=True)
     dpg.configure_item('clear_parameters', enabled=True)
-    dpg.configure_item('math_channels', enabled=True)
+    dpg.configure_item('math_btn', enabled=True)
+    dpg.configure_item('math_channels_btn', enabled=True)
     # delete parameter table if it already exists
     if dpg.does_item_exist('parameter_table'):
         dpg.delete_item('parameter_table')
@@ -130,9 +139,13 @@ def load_config(file = None):
     presets = os.listdir(preset_folder_path)
     for preset in presets:
         dpg.add_selectable(parent='offline_presets_list', label=preset, filter_key=preset, callback=load_preset, user_data=preset)
-    
     for preset in presets:
         dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
+    
+    # add existing math channels
+    # TODO: save the created math channels locally somehow
+    for channel in math_channels_dict.keys():
+        dpg.add_selectable(parent='math_channels_list', label=channel, filter_key=channel, callback=add_plot_math, user_data=channel)
 
 
 
@@ -497,20 +510,30 @@ def delete_preset(sender, app_data, preset_name):
         dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
 
 # callback for math
-def math_channels(sender):
-    global is_custum_parameter_1_empty
-    global is_custum_parameter_2_empty
-    with dpg.window(label="Create Custum Paramter", tag="math_channel_window", width=300, height=300):
-        dpg.add_button(tag='choose_parameters_btn',label="Choose parameters +")
-        dpg.add_button(tag='choose_operator_btn', label="Choose operator +")
+def math_btn_callback(sender):
+    global custom_parameters_list
+    global screen_width
+    with dpg.window(label="Create Custom Parameter", tag="math_channel_window", width=screen_width/2, height=400):
+        with dpg.group(horizontal=True, parent='math_channel_window'):
+            dpg.add_button(tag='clear_custom_parameter_equation', label='Clear', callback=clear_custom_parameter_equation)
+            dpg.add_button(tag='choose_parameters_btn',label="Add parameter +")
+            dpg.add_button(tag='choose_operator_btn', label="Add operator +")
 
+        # list of parameters
         with dpg.popup('choose_parameters_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
             dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('math_channel_parameter_list', val))
             with dpg.filter_set(tag='math_channel_parameter_list'):
                 pass
+
         for parameter in parameters.values():
             dpg.add_selectable(parent='math_channel_parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=save_parameter_name, user_data=parameter['id'])
         
+        # let users add constants
+        dpg.add_text("Add constant: ")
+        dpg.add_input_text(tag="new_custum_parameter_constant")
+        dpg.add_button(label="Add", callback=math_save_constant)
+
+        # list of operators
         with dpg.popup('choose_operator_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
             dpg.add_input_text(hint='Operator', callback=lambda _, val: dpg.set_value('math_channel_operators', val))
             with dpg.filter_set(tag='math_channel_operators'):
@@ -518,28 +541,188 @@ def math_channels(sender):
                 dpg.add_selectable(parent='math_channel_operators', label='-', filter_key='-', callback=save_operator, user_data='-')
                 dpg.add_selectable(parent='math_channel_operators', label='/', filter_key='/', callback=save_operator, user_data='/')
                 dpg.add_selectable(parent='math_channel_operators', label='*', filter_key='*', callback=save_operator, user_data='*')
+                dpg.add_selectable(parent='math_channel_operators', label='(', filter_key='(', callback=save_operator, user_data='(')
+                dpg.add_selectable(parent='math_channel_operators', label=')', filter_key=')', callback=save_operator, user_data=')')
 
-        with dpg.group(tag='chosen_custom_parameters'):
-            dpg.add_text('SELECTED PARAMETERS: ', color=COLORS['red'])
-        with dpg.group(tag='math_operator'):
-            dpg.add_text('OPERATOR: ', color=COLORS['red'])
+        with dpg.group(tag='chosen_custom_parameters_group'):
+            dpg.add_text('EQUATION: ', color=COLORS['red'])
         
         dpg.add_text("Enter custum parameter name: ")
-        dpg.add_input_text(tag="new_custum_parameter_name")
-        dpg.add_button(label="Create Custum Paramter", callback=placeholder)
+        dpg.add_input_text(tag="new_custom_parameter_name")
 
+        dpg.add_text("Enter custum parameter unit: ")
+        dpg.add_input_text(tag="new_custom_parameter_unit")
+
+        dpg.add_button(label="Create", callback=create_math_channel, user_data=custom_parameters_list)
+        custom_parameters_list = []
+
+def create_math_channel(sender):
+    global custom_parameters_list
+    global math_channels_dict
+
+    channel_name = dpg.get_value('new_custom_parameter_name')
+    channel_unit = dpg.get_value('new_custom_parameter_unit')
+
+    if (channel_name not in math_channels_dict):
+        math_channels_dict[channel_name] = [custom_parameters_list, channel_unit]
+    
+    dpg.add_selectable(parent='math_channels_list', label=channel_name, filter_key=channel_name, callback=add_plot_math, user_data=channel_name)
+    
+    custom_parameters_list = []
+
+    dpg.delete_item('math_channel_window')
+    dpg.delete_item('math_channel_parameter_list')
+    dpg.delete_item('math_channel_operators')
+
+
+# add a parameter name to the current equation
 def save_parameter_name(sender, app_data, pid):
     global custom_parameters_list
     custom_parameters_list.append(parameters[pid]['name'])
-    dpg.add_text(parameters[pid]['name'], parent='chosen_custom_parameters', color=COLORS['red'])
+    if (dpg.does_item_exist('custom_parameter_equation') == False):
+        dpg.add_text(parameters[pid]['name'],tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
+    else:
+        placeholder = dpg.get_value('custom_parameter_equation')
+        dpg.delete_item('custom_parameter_equation')
+        dpg.add_text(placeholder + ' ' + parameters[pid]['name'],tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
 
+# add an operator to the current equation
 def save_operator(sender, app_data, op):
-    global operator
-    operator = op
-    dpg.add_text(op, parent='math_operator', color=COLORS['red'])
+    global custom_parameters_list
+    if (dpg.does_item_exist('custom_parameter_equation')):
+        custom_parameters_list.append(op)
+        placeholder = dpg.get_value('custom_parameter_equation')
+        dpg.delete_item('custom_parameter_equation')
+        dpg.add_text(placeholder + ' ' + op, tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
+    else:
+        if (op == '('):
+            dpg.add_text(op,tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
 
-def placeholder(sender):
-    print()
+# add a constant to the current equation
+def math_save_constant(sender):
+    global custom_parameters_list
+    constant = dpg.get_value('new_custum_parameter_constant')
+    if constant.isnumeric():
+        custom_parameters_list.append(constant)
+
+    if (dpg.does_item_exist('custom_parameter_equation')):
+        placeholder = dpg.get_value('custom_parameter_equation')
+        dpg.delete_item('custom_parameter_equation')
+        dpg.add_text(placeholder + ' ' + constant, tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
+    else:
+        dpg.add_text(constant, tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
+
+# clear the existing custum parameters equation
+def clear_custom_parameter_equation(sender):
+    if (dpg.does_item_exist('custom_parameter_equation')):
+        dpg.delete_item('custom_parameter_equation')
+
+
+# Evaluates an infix expression, input is a list of tokens.
+# Example of an inflix expression: "(", "1.5", "+", "2.3", ")", "*", "3.0"].
+def evaluate_infix(expression):
+    # Define operator precedence
+    precedence = {"+": 1, "-": 1, "*": 2, "/": 2, "^": 3}
+    operators = precedence.keys()
+
+    def apply_operator(op, b, a):
+        """Applies an operator to two operands and returns the result."""
+        if op == "+":
+            return a + b
+        elif op == "-":
+            return a - b
+        elif op == "*":
+            return a * b
+        elif op == "/":
+            if b == 0:
+                raise ZeroDivisionError("Division by zero.")
+            return a / b
+        elif op == "^":
+            return a ** b
+        else:
+            raise ValueError(f"Unknown operator: {op}")
+
+    # Stack-based evaluation
+    values = []  # Stack for numbers
+    ops = []     # Stack for operators
+
+    def precedence_of(op):
+        """Returns the precedence of an operator."""
+        return precedence[op] if op in precedence else 0
+
+    i = 0
+    while i < len(expression):
+        token = expression[i]
+
+        # If the token is a number (integer or float)
+        if token.replace(".", "", 1).isdigit():
+            values.append(float(token))  # Convert to float
+        elif token == "(":  # If token is a left parenthesis
+            ops.append(token)
+        elif token == ")":  # If token is a right parenthesis
+            while ops and ops[-1] != "(":
+                values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
+            ops.pop()  # Remove the "("
+        elif token in operators:  # If token is an operator
+            # Handle precedence and associativity
+            while (ops and ops[-1] != "(" and
+                    precedence_of(ops[-1]) >= precedence_of(token)):
+                values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
+            ops.append(token)
+        else:
+            raise ValueError(f"Invalid token: {token}")
+
+        i += 1
+
+    # Apply remaining operators
+    while ops:
+        values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
+
+    return values[0]
+
+
+def add_plot_math(sender, app_data, channel_name):
+    global math_channels_dict
+#     global is_collumn_two
+#     global last_coord
+#     global parameters
+
+    print(channel_name)
+    print(math_channels_dict[channel_name])
+
+    # # check if pid is defined in loaded config
+    # if pid not in parameters:
+    #     return
+    # # check if current plot already exists
+    # pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    # if pid in pids:
+    #     return
+
+    # parameter = parameters[pid]
+
+    # print(equation_list)
+    # name = dpg.get_value('new_custom_parameter_name')
+    # unit = dpg.get_value('new_custom_parameter_unit')
+
+    # # add new plot
+    # if is_collumn_two:
+    #     with dpg.collapsing_header(tag=f'custom_{name}_collapsing_header',label=name, closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 120)):
+    #         with dpg.plot(tag=f'p_plot_{name}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 97)):
+    #             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{name}_x')
+    #             dpg.add_plot_axis(dpg.mvYAxis, label=unit, tag=f'{name}_y')
+    #             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
+    #             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
+    #     is_collumn_two = False
+    #     last_coord = (last_coord[0]+400,last_coord[1])
+    # else:
+    #     with dpg.collapsing_header(tag=f'custom_{name}_collapsing_header', label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(0,last_coord[1] + 55)):
+    #         with dpg.plot(tag=f'p_plot_{pid}', width=(screen_width/2) - 8, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
+    #             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
+    #             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
+    #             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
+    #             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
+    #     is_collumn_two = True
+    #     last_coord = (0,last_coord[1]+175)
 
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
@@ -577,7 +760,8 @@ with dpg.window(tag='window'):
                 dpg.add_button(tag='add_btn', label='Add Parameter +')
                 dpg.add_button(tag='theme_toggle', label='Toggle Light/Dark Mode', callback=toggle_mode)
                 dpg.add_button(tag='clear_parameters', label='Clear', callback=clear_parameters, enabled=False)
-                dpg.add_button(tag='math_channels', label='Math', callback=math_channels, enabled=False)
+                dpg.add_button(tag='math_btn', label='Math', callback=math_btn_callback, enabled=False)
+                dpg.add_button(tag='math_channels_btn', label='Math Channels +', enabled=False)
                 dpg.add_button(tag='load_preset', label='Load Preset +', enabled=False)
                 dpg.add_button(tag='save_preset', label='Save Preset', callback=save_preset, enabled=False)
                 dpg.add_button(tag='delete_preset', label='Delete Preset +', enabled=False)
@@ -601,7 +785,12 @@ with dpg.window(tag='window'):
                 dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('parameter_list', val))
                 with dpg.filter_set(tag='parameter_list'):
                     pass
-       
+            
+            with dpg.popup('math_channels_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
+                dpg.add_input_text(hint='Name', callback=lambda _, val: dpg.set_value('math_channels_list', val))
+                with dpg.filter_set(tag='math_channels_list'):
+                    pass
+
             with dpg.popup('settings_btn', modal=True, no_move=True, mousebutton=dpg.mvMouseButton_Left):
                 dpg.add_text(f'IP: {IP}', color=COLORS['gray'])
                 dpg.add_separator()
@@ -677,6 +866,10 @@ def update_plots():
     global node
     global toggle_press
     while True:
+        # print(plot_data)
+        # print('')
+        # print()
+        # print()
         if (toggle_press == 1):
             change_theme()
             toggle_press = 0
