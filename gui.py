@@ -46,10 +46,17 @@ is_custum_parameter_1_empty = True
 is_custum_parameter_2_empty = True
 custom_parameters_list = []
 math_channels_dict = {
-    'Wheel RPM': [['Electrical RPM', '/', '10'], 'NA'],
-    'Average Wheel Speeds': [['Wheel Speed FL', '+', 'Wheel Speed FR', ')', '/', '2'], 'NA'],
-    'Total VBat': [['VBat Channel 0 Current', '+', 'VBat Channel 1 Current', '+', 'VBat Channel 2 Current', '+', 'VBat Channel 3 Current', 
-                    '+', 'VBat Channel 4 Current', '+', 'VBat Channel 5 Current', '+', 'VBat Channel 6 Current'], 'V']
+    # these are just hard coded channels for testing purposes
+    'Wheel RPM': {
+        'equation': [[3, 'Electrical RPM'], '/', '10'], 
+        'placeholder_equation': [[3, 'Electrical RPM'], '/', '10'],
+        'unit': 'NA'
+        },
+    'Average Wheel Speeds': {
+        'equation': [[1, 'SOE by OCV'], [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '4'], 
+        'placeholder_equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '4'],
+        'unit': 'NA'
+        },
 }
 operator = ''
 # Use tkinter to get the screen's width and height
@@ -57,6 +64,9 @@ screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 parameters = {}
 plot_data = {}
+# separate plot data dictionary for math channels, keys are names of the math channels
+math_channels_plot_data = {}
+
 # Returns the directory where the script or executable is located.
 def get_executable_dir():
     if getattr(sys, 'frozen', False):  # Running as an executable
@@ -74,6 +84,7 @@ def load_config(file = None):
     global node
     global parameters
     global plot_data
+    global math_channels_plot_data
     global math_channels_dict
     # open file dialog
     # root = tk.Tk()
@@ -101,6 +112,12 @@ def load_config(file = None):
             'x': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
             'y': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
         } for id in parameters.keys()
+    }
+    math_channels_plot_data = {
+        name: {
+            'x': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+            'y': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
+        } for name in math_channels_dict.keys()
     }
 
     # update loaded config path
@@ -134,7 +151,6 @@ def load_config(file = None):
     dpg.delete_item('parameter_list', children_only=True)
     for parameter in parameters.values():
         dpg.add_selectable(parent='parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=add_plot, user_data=parameter['id'])
-
     # add existing presets to filter-set for load and delete
     presets = os.listdir(preset_folder_path)
     for preset in presets:
@@ -513,7 +529,7 @@ def delete_preset(sender, app_data, preset_name):
 def math_btn_callback(sender):
     global custom_parameters_list
     global screen_width
-    with dpg.window(label="Create Custom Parameter", tag="math_channel_window", width=screen_width/2, height=400):
+    with dpg.window(label="Create Custom Parameter", tag="math_channel_window", width=screen_width/2, height=300):
         with dpg.group(horizontal=True, parent='math_channel_window'):
             dpg.add_button(tag='clear_custom_parameter_equation', label='Clear', callback=clear_custom_parameter_equation)
             dpg.add_button(tag='choose_parameters_btn',label="Add parameter +")
@@ -529,9 +545,10 @@ def math_btn_callback(sender):
             dpg.add_selectable(parent='math_channel_parameter_list', label=parameter['name'], filter_key=parameter['name'], callback=save_parameter_name, user_data=parameter['id'])
         
         # let users add constants
-        dpg.add_text("Add constant: ")
-        dpg.add_input_text(tag="new_custum_parameter_constant")
-        dpg.add_button(label="Add", callback=math_save_constant)
+        with dpg.group(horizontal=True):
+            dpg.add_text("Add constant: ")
+            dpg.add_input_text(tag="new_custum_parameter_constant", width=140)
+            dpg.add_button(label="Add", callback=math_save_constant)
 
         # list of operators
         with dpg.popup('choose_operator_btn', no_move=True, mousebutton=dpg.mvMouseButton_Left):
@@ -546,12 +563,12 @@ def math_btn_callback(sender):
 
         with dpg.group(tag='chosen_custom_parameters_group'):
             dpg.add_text('EQUATION: ', color=COLORS['red'])
-        
-        dpg.add_text("Enter custum parameter name: ")
-        dpg.add_input_text(tag="new_custom_parameter_name")
-
-        dpg.add_text("Enter custum parameter unit: ")
-        dpg.add_input_text(tag="new_custom_parameter_unit")
+        with dpg.group(horizontal=True):
+            dpg.add_text("Enter custom parameter name: (required)")
+            dpg.add_text("Enter custom parameter unit: (required)")
+        with dpg.group(horizontal=True):
+            dpg.add_input_text(tag="new_custom_parameter_name", width=275)
+            dpg.add_input_text(tag="new_custom_parameter_unit", width=275)
 
         dpg.add_button(label="Create", callback=create_math_channel, user_data=custom_parameters_list)
         custom_parameters_list = []
@@ -559,12 +576,21 @@ def math_btn_callback(sender):
 def create_math_channel(sender):
     global custom_parameters_list
     global math_channels_dict
+    global math_channels_plot_data
 
     channel_name = dpg.get_value('new_custom_parameter_name')
     channel_unit = dpg.get_value('new_custom_parameter_unit')
 
     if (channel_name not in math_channels_dict):
-        math_channels_dict[channel_name] = [custom_parameters_list, channel_unit]
+        math_channels_dict[channel_name] = {}
+        math_channels_dict[channel_name]['equation'] = custom_parameters_list
+        math_channels_dict[channel_name]['placeholder_equation'] = custom_parameters_list
+        math_channels_dict[channel_name]['unit'] = channel_unit
+    
+    math_channels_plot_data[channel_name] = {
+            'x': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+            'y': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
+        }
     
     dpg.add_selectable(parent='math_channels_list', label=channel_name, filter_key=channel_name, callback=add_plot_math, user_data=channel_name)
     
@@ -578,7 +604,7 @@ def create_math_channel(sender):
 # add a parameter name to the current equation
 def save_parameter_name(sender, app_data, pid):
     global custom_parameters_list
-    custom_parameters_list.append(parameters[pid]['name'])
+    custom_parameters_list.append([pid, parameters[pid]['name']])
     if (dpg.does_item_exist('custom_parameter_equation') == False):
         dpg.add_text(parameters[pid]['name'],tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
     else:
@@ -590,12 +616,12 @@ def save_parameter_name(sender, app_data, pid):
 def save_operator(sender, app_data, op):
     global custom_parameters_list
     if (dpg.does_item_exist('custom_parameter_equation')):
-        custom_parameters_list.append(op)
         placeholder = dpg.get_value('custom_parameter_equation')
         dpg.delete_item('custom_parameter_equation')
         dpg.add_text(placeholder + ' ' + op, tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
     else:
         if (op == '('):
+            custom_parameters_list.append(op)
             dpg.add_text(op,tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
 
 # add a constant to the current equation
@@ -642,12 +668,11 @@ def evaluate_infix(expression):
         else:
             raise ValueError(f"Unknown operator: {op}")
 
-    # Stack-based evaluation
     values = []  # Stack for numbers
     ops = []     # Stack for operators
 
     def precedence_of(op):
-        """Returns the precedence of an operator."""
+        # Returns the precedence of an operator
         return precedence[op] if op in precedence else 0
 
     i = 0
@@ -680,42 +705,49 @@ def evaluate_infix(expression):
 
     return values[0]
 
+# returns the pid given the pname
+def find_pid(pname):
+    global parameters
+    for parameter in parameters:
+        if parameters['name'] == pname:
+            return parameters['id']
 
+# add math channel plot
 def add_plot_math(sender, app_data, channel_name):
     global math_channels_dict
-#     global is_collumn_two
-#     global last_coord
-#     global parameters
-
     print(channel_name)
     print(math_channels_dict[channel_name])
+    global is_collumn_two
+    global last_coord
+    global parameters
 
-    # # check if pid is defined in loaded config
-    # if pid not in parameters:
-    #     return
-    # # check if current plot already exists
-    # pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
-    # if pid in pids:
-    #     return
+    # TODO: create a list for opened math channels, check here if current plot already exists
+
+    # check if channel name is defined in math channels dictionary
+    if channel_name not in math_channels_dict:
+        return
 
     # parameter = parameters[pid]
 
-    # print(equation_list)
-    # name = dpg.get_value('new_custom_parameter_name')
-    # unit = dpg.get_value('new_custom_parameter_unit')
+    # # clean-up in case this plot was removed and re-added
+    # if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
+    # if dpg.does_alias_exist(f'{pid}_x'): dpg.remove_alias(f'{pid}_x')
+    # if dpg.does_alias_exist(f'{pid}_y'): dpg.remove_alias(f'{pid}_y')
+    # if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
+    # if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
 
     # # add new plot
     # if is_collumn_two:
-    #     with dpg.collapsing_header(tag=f'custom_{name}_collapsing_header',label=name, closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 120)):
-    #         with dpg.plot(tag=f'p_plot_{name}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 97)):
-    #             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{name}_x')
-    #             dpg.add_plot_axis(dpg.mvYAxis, label=unit, tag=f'{name}_y')
+    #     with dpg.collapsing_header(tag=f'{pid}_collapsing_header',label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 120)):
+    #         with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 97)):
+    #             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
+    #             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
     #             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
     #             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
     #     is_collumn_two = False
     #     last_coord = (last_coord[0]+400,last_coord[1])
     # else:
-    #     with dpg.collapsing_header(tag=f'custom_{name}_collapsing_header', label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(0,last_coord[1] + 55)):
+    #     with dpg.collapsing_header(tag=f'{pid}_collapsing_header', label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(0,last_coord[1] + 55)):
     #         with dpg.plot(tag=f'p_plot_{pid}', width=(screen_width/2) - 8, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
     #             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
     #             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
@@ -866,10 +898,6 @@ def update_plots():
     global node
     global toggle_press
     while True:
-        # print(plot_data)
-        # print('')
-        # print()
-        # print()
         if (toggle_press == 1):
             change_theme()
             toggle_press = 0
@@ -878,18 +906,32 @@ def update_plots():
             # update plot data
             plot_data[id]['x'].append(t)
             plot_data[id]['y'].append(value)
+            # update placeholer equation for math
+            for pname in math_channels_dict:
+                for index, token in enumerate(math_channels_dict[pname]['placeholder_equation']):
+                    if isinstance(token, list):
+                        if id == token[0]:
+                            math_channels_dict[pname]['placeholder_equation'][index] = str(value)
+
             # if plot is visible, update series
             if dpg.does_item_exist(f'{id}_series'):
                 dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
                 dpg.set_item_label(f'{id}_value', round(plot_data[id]['y'][-1], 3))
                 dpg.fit_axis_data(f'{id}_x')
                 dpg.bind_item_theme(f'{id}_series', "plot_theme")
+        for pname in math_channels_plot_data:
+            # calculate placeholder equation
+            value = evaluate_infix(math_channels_dict[pname]['placeholder_equation'])
+            math_channels_plot_data[pname]['x'].append(t)
+            math_channels_plot_data[pname]['y'].append(value)
+        print(math_channels_plot_data)
         time.sleep(1 / PLOT_RATE_HZ)
 
 threading.Thread(target=update_plots, daemon=True).start()
 
 # checks for any TKinter calls
 # forces TKinter calls to run on main thread
+# this is a work around to the gui crashing on Macs
 while dpg.is_dearpygui_running():
     if dpg.get_value('should_open_yaml'):
         dpg.set_value('should_open_yaml', False)
