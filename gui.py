@@ -14,6 +14,7 @@ import csv
 import os
 import sys
 import copy
+import ast
 
 from lib import gcan
 from lib import gdat
@@ -48,18 +49,17 @@ is_custum_parameter_2_empty = True
 custom_parameters_list = []
 math_channels_dict = {
     # these are just hard coded channels for testing purposes
-    'Wheel RPM': {
-        'equation': [[3, 'Electrical RPM'], '/', '10'], 
-        'placeholder_equation': [[3, 'Electrical RPM'], '/', '10'],
-        'unit': 'NA'
-        },
-    'Average Front Wheel Speeds': {
-        'equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'], 
-        'placeholder_equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'],
-        'unit': 'NA'
-        },
+    # 'Wheel RPM': {
+    #     'equation': [[3, 'Electrical RPM'], '/', '10'], 
+    #     'placeholder_equation': [[3, 'Electrical RPM'], '/', '10'],
+    #     'unit': 'NA'
+    #     },
+    # 'Average Front Wheel Speeds': {
+    #     'equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'], 
+    #     'placeholder_equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'],
+    #     'unit': 'NA'
+    #     }
 }
-operator = ''
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -74,8 +74,25 @@ def get_executable_dir():
         return os.path.dirname(sys.executable)
     else:  # Running as a script
         return os.path.dirname(os.path.abspath(__file__))
+
+# Path to folder containing all gopher vision saved data, create it if it doesn't exist
+app_data_folder_path = os.path.join(get_executable_dir(), "Gopher_Vision_data")
+if not os.path.exists(app_data_folder_path):
+    os.makedirs(app_data_folder_path)
+
+# Path to math_channels.csv, create it if it doesn't exist
+math_channels_CSVFile_path = os.path.join(app_data_folder_path, "math_channels.csv")
+if not os.path.exists(math_channels_CSVFile_path):  # Check if the file exists
+    # Create the file
+    with open(math_channels_CSVFile_path, mode='w', newline='', encoding='utf-8') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(['Name', 'equation', 'unit'])
+    print(f"File created at: {math_channels_CSVFile_path}")
+else:
+    print(f"File found at: {math_channels_CSVFile_path}")
+
 # path to the existing/created local presets folder
-preset_folder_path = os.path.join(get_executable_dir(), "presets")
+preset_folder_path = os.path.join(app_data_folder_path, "presets")
 if not os.path.exists(preset_folder_path):
     os.makedirs(preset_folder_path)
 
@@ -87,9 +104,6 @@ def load_config(file = None):
     global plot_data
     global math_channels_plot_data
     global math_channels_dict
-    # open file dialog
-    # root = tk.Tk()
-    # root.withdraw()
     if file:
         path = file
     else:
@@ -113,12 +127,6 @@ def load_config(file = None):
             'x': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
             'y': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
         } for id in parameters.keys()
-    }
-    math_channels_plot_data = {
-        name: {
-            'x': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
-            'y': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
-        } for name in math_channels_dict.keys()
     }
 
     # update loaded config path
@@ -159,10 +167,28 @@ def load_config(file = None):
     for preset in presets:
         dpg.add_selectable(parent='offline_presets_list_delete', label=preset, filter_key=preset, callback=delete_preset, user_data=preset)
     
-    # add existing math channels
-    # TODO: save the created math channels locally somehow
+    # Read and add saved math channels from csv file
+    with open(math_channels_CSVFile_path, mode='r', newline='', encoding='utf-8') as csv_file:
+        reader = csv.reader(csv_file)
+        header = next(reader) 
+        for row in reader:
+            math_channels_dict[row[0]] = {}
+            # Use ast to convert the string to a Python object
+            math_channels_dict[row[0]]['equation'] = ast.literal_eval(row[1])
+            math_channels_dict[row[0]]['placeholder_equation'] = ast.literal_eval(row[1])
+            math_channels_dict[row[0]]['unit'] = row[2]
+
+    # Add saved math channels to dropdown menu
     for channel in math_channels_dict.keys():
         dpg.add_selectable(parent='math_channels_list', label=channel, filter_key=channel, callback=add_plot_math, user_data=channel)
+
+    # Populate plot data for math channels
+    math_channels_plot_data = {
+        name: {
+            'x': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+            'y': deque([0], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
+        } for name in math_channels_dict.keys()
+    }
 
 
 
@@ -256,7 +282,7 @@ def add_plot(sender, app_data, pid):
 def clear_parameters(sender):
     global is_collumn_two
     global last_coord
-    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias and alias[7:] not in math_channels_dict]
     for pid in pids:
         dpg.delete_item(f'{pid}_collapsing_header')
         if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
@@ -264,6 +290,16 @@ def clear_parameters(sender):
         if dpg.does_alias_exist(f'{pid}_y'): dpg.remove_alias(f'{pid}_y')
         if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
         if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
+    
+    # clear math channels
+    for pname in math_channels_dict:
+        dpg.delete_item(f'{pname}_collapsing_header')
+        if dpg.does_alias_exist(f'p_plot_{pname}'): dpg.remove_alias(f'p_plot_{pname}')
+        if dpg.does_alias_exist(f'{pname}_x'): dpg.remove_alias(f'{pname}_x')
+        if dpg.does_alias_exist(f'{pname}_y'): dpg.remove_alias(f'{pname}_y')
+        if dpg.does_alias_exist(f'{pname}_series'): dpg.remove_alias(f'{pname}_series')
+        if dpg.does_alias_exist(f'{pname}_value'): dpg.remove_alias(f'{pname}_value')
+    
     is_collumn_two = False
     last_coord = (0,0)
 
@@ -595,14 +631,16 @@ def create_math_channel(sender):
         }
     
     dpg.add_selectable(parent='math_channels_list', label=channel_name, filter_key=channel_name, callback=add_plot_math, user_data=channel_name)
+
+    with open(math_channels_CSVFile_path, mode='a', newline='', encoding='utf-8') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow([channel_name, custom_parameters_list, channel_unit])
     
     custom_parameters_list = []
 
     dpg.delete_item('math_channel_window')
     dpg.delete_item('math_channel_parameter_list')
     dpg.delete_item('math_channel_operators')
-
-
 
 # add a parameter name to the current equation
 def save_parameter_name(sender, app_data, pid):
@@ -723,13 +761,14 @@ def evaluate_infix(expression):
 def add_plot_math(sender, app_data, channel_name):
     global math_channels_dict
     global math_channels_plot_data
-    print(math_channels_dict[channel_name])
     global is_collumn_two
     global last_coord
     global parameters
 
-    # TODO: create a list for opened math channels, check here if current plot already exists
-
+    # check if current plot already exists
+    pnames = [alias[7:] for alias in dpg.get_aliases() if 'p_plot_' in alias and alias[7:] in math_channels_dict]
+    if channel_name in pnames:
+        return
     # check if channel name is defined in math channels dictionary
     if channel_name not in math_channels_dict:
         return
@@ -918,22 +957,7 @@ def update_plots():
                 for index, token in enumerate(math_channels_dict[pname]['equation']):
                     if isinstance(token, list):
                         if id == token[0]:
-                            # print(math_channels_dict[pname]['equation'])
-                            # print(index)
-                            if (pname == "test"):
-                                print("original before")
-                                print(math_channels_dict[pname]['equation'])
-                                print("placeholder before:")
-                                print(math_channels_dict[pname]['placeholder_equation'])
                             math_channels_dict[pname]['placeholder_equation'][index] = str(value) 
-                            if (pname == "test"):
-                                print("original after")
-                                print(math_channels_dict[pname]['equation'])
-                                print("placeholder after:")
-                                print(math_channels_dict[pname]['placeholder_equation'])
-                            # print(f"value is {value}")
-                            # print(math_channels_dict[pname]['placeholder_equation'])
-
             # if plot is visible, update series
             if dpg.does_item_exist(f'{id}_series'):
                 dpg.set_value(f'{id}_series', [list(plot_data[id]['x']), list(plot_data[id]['y'])])
@@ -941,18 +965,14 @@ def update_plots():
                 dpg.fit_axis_data(f'{id}_x')
                 dpg.bind_item_theme(f'{id}_series', "plot_theme")
         for pname in math_channels_plot_data:
-            # print(math_channels_dict[pname]['placeholder_equation'])
             # calculate placeholder equation
             value = evaluate_infix(math_channels_dict[pname]['placeholder_equation'])
-            # print(value)
             math_channels_plot_data[pname]['x'].append(t)
             math_channels_plot_data[pname]['y'].append(value)
             if dpg.does_item_exist(f'{pname}_series'):
                 dpg.set_value(f'{pname}_series', [list(math_channels_plot_data[pname]['x']), list(math_channels_plot_data[pname]['y'])])
                 dpg.set_item_label(f'{pname}_value', round(math_channels_plot_data[pname]['y'][-1], 3))
                 dpg.fit_axis_data(f'{pname}_x')
-                # dpg.bind_item_theme(f'{pname}_series', "plot_theme")
-        # print(math_channels_plot_data)
         time.sleep(1 / PLOT_RATE_HZ)
 
 threading.Thread(target=update_plots, daemon=True).start()
