@@ -13,6 +13,7 @@ import serial.tools.list_ports
 import csv
 import os
 import sys
+import copy
 
 from lib import gcan
 from lib import gdat
@@ -52,9 +53,9 @@ math_channels_dict = {
         'placeholder_equation': [[3, 'Electrical RPM'], '/', '10'],
         'unit': 'NA'
         },
-    'Average Wheel Speeds': {
-        'equation': [[1, 'SOE by OCV'], [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '4'], 
-        'placeholder_equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '4'],
+    'Average Front Wheel Speeds': {
+        'equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'], 
+        'placeholder_equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'],
         'unit': 'NA'
         },
 }
@@ -218,7 +219,7 @@ def add_plot(sender, app_data, pid):
     if pid not in parameters:
         return
     # check if current plot already exists
-    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias and alias[7:] not in math_channels_dict]
     if pid in pids:
         return
 
@@ -583,8 +584,9 @@ def create_math_channel(sender):
 
     if (channel_name not in math_channels_dict):
         math_channels_dict[channel_name] = {}
-        math_channels_dict[channel_name]['equation'] = custom_parameters_list
-        math_channels_dict[channel_name]['placeholder_equation'] = custom_parameters_list
+        # use deep copy here to ensure that it references different places in memory
+        math_channels_dict[channel_name]['equation'] = copy.deepcopy(custom_parameters_list)
+        math_channels_dict[channel_name]['placeholder_equation'] = copy.deepcopy(custom_parameters_list)
         math_channels_dict[channel_name]['unit'] = channel_unit
     
     math_channels_plot_data[channel_name] = {
@@ -599,6 +601,7 @@ def create_math_channel(sender):
     dpg.delete_item('math_channel_window')
     dpg.delete_item('math_channel_parameter_list')
     dpg.delete_item('math_channel_operators')
+
 
 
 # add a parameter name to the current equation
@@ -616,6 +619,7 @@ def save_parameter_name(sender, app_data, pid):
 def save_operator(sender, app_data, op):
     global custom_parameters_list
     if (dpg.does_item_exist('custom_parameter_equation')):
+        custom_parameters_list.append(op)
         placeholder = dpg.get_value('custom_parameter_equation')
         dpg.delete_item('custom_parameter_equation')
         dpg.add_text(placeholder + ' ' + op, tag='custom_parameter_equation', parent='chosen_custom_parameters_group', color=COLORS['red'])
@@ -642,7 +646,7 @@ def math_save_constant(sender):
 def clear_custom_parameter_equation(sender):
     if (dpg.does_item_exist('custom_parameter_equation')):
         dpg.delete_item('custom_parameter_equation')
-
+        custom_parameters_list = []
 
 # Evaluates an infix expression, input is a list of tokens.
 # Example of an inflix expression: "(", "1.5", "+", "2.3", ")", "*", "3.0"].
@@ -661,7 +665,7 @@ def evaluate_infix(expression):
             return a * b
         elif op == "/":
             if b == 0:
-                raise ZeroDivisionError("Division by zero.")
+                return 0  # Avoid division by zero
             return a / b
         elif op == "^":
             return a ** b
@@ -679,8 +683,11 @@ def evaluate_infix(expression):
     while i < len(expression):
         token = expression[i]
 
+        # If the token is a negative number (e.g., "-90.0466")
+        if token.startswith("-") and token[1:].replace(".", "", 1).isdigit():
+            values.append(float(token))  # Convert to float
         # If the token is a number (integer or float)
-        if token.replace(".", "", 1).isdigit():
+        elif token.replace(".", "", 1).isdigit():
             values.append(float(token))  # Convert to float
         elif token == "(":  # If token is a left parenthesis
             ops.append(token)
@@ -689,11 +696,18 @@ def evaluate_infix(expression):
                 values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
             ops.pop()  # Remove the "("
         elif token in operators:  # If token is an operator
-            # Handle precedence and associativity
-            while (ops and ops[-1] != "(" and
-                    precedence_of(ops[-1]) >= precedence_of(token)):
-                values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
-            ops.append(token)
+            # Handle negative numbers (unary minus) by looking at the previous token
+            if token == "-" and (i == 0 or expression[i - 1] in operators or expression[i - 1] == "("):
+                # Treat it as a negative number
+                i += 1
+                token = "-" + expression[i]  # Combine with the next token
+                values.append(float(token))
+            else:
+                # Handle precedence and associativity
+                while (ops and ops[-1] != "(" and
+                        precedence_of(ops[-1]) >= precedence_of(token)):
+                    values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
+                ops.append(token)
         else:
             raise ValueError(f"Invalid token: {token}")
 
@@ -705,17 +719,10 @@ def evaluate_infix(expression):
 
     return values[0]
 
-# returns the pid given the pname
-def find_pid(pname):
-    global parameters
-    for parameter in parameters:
-        if parameters['name'] == pname:
-            return parameters['id']
-
 # add math channel plot
 def add_plot_math(sender, app_data, channel_name):
     global math_channels_dict
-    print(channel_name)
+    global math_channels_plot_data
     print(math_channels_dict[channel_name])
     global is_collumn_two
     global last_coord
@@ -727,34 +734,34 @@ def add_plot_math(sender, app_data, channel_name):
     if channel_name not in math_channels_dict:
         return
 
-    # parameter = parameters[pid]
+    channel_unit = math_channels_dict[channel_name]['unit']
 
-    # # clean-up in case this plot was removed and re-added
-    # if dpg.does_alias_exist(f'p_plot_{pid}'): dpg.remove_alias(f'p_plot_{pid}')
-    # if dpg.does_alias_exist(f'{pid}_x'): dpg.remove_alias(f'{pid}_x')
-    # if dpg.does_alias_exist(f'{pid}_y'): dpg.remove_alias(f'{pid}_y')
-    # if dpg.does_alias_exist(f'{pid}_series'): dpg.remove_alias(f'{pid}_series')
-    # if dpg.does_alias_exist(f'{pid}_value'): dpg.remove_alias(f'{pid}_value')
+    # clean-up in case this plot was removed and re-added
+    if dpg.does_alias_exist(f'p_plot_{channel_name}'): dpg.remove_alias(f'p_plot_{channel_name}')
+    if dpg.does_alias_exist(f'{channel_name}_x'): dpg.remove_alias(f'{channel_name}_x')
+    if dpg.does_alias_exist(f'{channel_name}_y'): dpg.remove_alias(f'{channel_name}_y')
+    if dpg.does_alias_exist(f'{channel_name}_series'): dpg.remove_alias(f'{channel_name}_series')
+    if dpg.does_alias_exist(f'{channel_name}_value'): dpg.remove_alias(f'{channel_name}_value')
 
-    # # add new plot
-    # if is_collumn_two:
-    #     with dpg.collapsing_header(tag=f'{pid}_collapsing_header',label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 120)):
-    #         with dpg.plot(tag=f'p_plot_{pid}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 97)):
-    #             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
-    #             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
-    #             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
-    #             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
-    #     is_collumn_two = False
-    #     last_coord = (last_coord[0]+400,last_coord[1])
-    # else:
-    #     with dpg.collapsing_header(tag=f'{pid}_collapsing_header', label=f"{parameter['name']} ({pid})", closable=True, default_open=True, parent='tab-telemetry', pos=(0,last_coord[1] + 55)):
-    #         with dpg.plot(tag=f'p_plot_{pid}', width=(screen_width/2) - 8, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
-    #             dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{pid}_x')
-    #             dpg.add_plot_axis(dpg.mvYAxis, label=parameter['unit'], tag=f'{pid}_y')
-    #             dpg.add_line_series(list(plot_data[pid]['x']), list(plot_data[pid]['y']), label=parameter['name'], parent=f'{pid}_y', tag=f'{pid}_series')
-    #             dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{pid}_value')
-    #     is_collumn_two = True
-    #     last_coord = (0,last_coord[1]+175)
+    # add new plot
+    if is_collumn_two:
+        with dpg.collapsing_header(tag=f'{channel_name}_collapsing_header',label=channel_name, closable=True, default_open=True, parent='tab-telemetry', pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 120)):
+            with dpg.plot(tag=f'p_plot_{channel_name}', width=-1, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True, pos=(last_coord[0]+screen_width*0.5,last_coord[1] - 97)):
+                dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{channel_name}_x')
+                dpg.add_plot_axis(dpg.mvYAxis, label=channel_unit, tag=f'{channel_name}_y')
+                dpg.add_line_series(list(math_channels_plot_data[channel_name]['x']), list(math_channels_plot_data[channel_name]['y']), label=channel_name, parent=f'{channel_name}_y', tag=f'{channel_name}_series')
+                dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{channel_name}_value')
+        is_collumn_two = False
+        last_coord = (last_coord[0]+400,last_coord[1])
+    else:
+        with dpg.collapsing_header(tag=f'{channel_name}_collapsing_header', label=channel_name, closable=True, default_open=True, parent='tab-telemetry', pos=(0,last_coord[1] + 55)):
+            with dpg.plot(tag=f'p_plot_{channel_name}', width=(screen_width/2) - 8, height=150, no_mouse_pos=True, no_box_select=True, use_local_time=True, anti_aliased=True):
+                dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f'{channel_name}_x')
+                dpg.add_plot_axis(dpg.mvYAxis, label=channel_unit, tag=f'{channel_name}_y')
+                dpg.add_line_series(list(math_channels_plot_data[channel_name]['x']), list(math_channels_plot_data[channel_name]['y']), label=channel_name, parent=f'{channel_name}_y', tag=f'{channel_name}_series')
+                dpg.add_plot_annotation(label='0.0', offset=(float('inf'), float('inf')), tag=f'{channel_name}_value')
+        is_collumn_two = True
+        last_coord = (0,last_coord[1]+175)
 
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
@@ -908,10 +915,24 @@ def update_plots():
             plot_data[id]['y'].append(value)
             # update placeholer equation for math
             for pname in math_channels_dict:
-                for index, token in enumerate(math_channels_dict[pname]['placeholder_equation']):
+                for index, token in enumerate(math_channels_dict[pname]['equation']):
                     if isinstance(token, list):
                         if id == token[0]:
-                            math_channels_dict[pname]['placeholder_equation'][index] = str(value)
+                            # print(math_channels_dict[pname]['equation'])
+                            # print(index)
+                            if (pname == "test"):
+                                print("original before")
+                                print(math_channels_dict[pname]['equation'])
+                                print("placeholder before:")
+                                print(math_channels_dict[pname]['placeholder_equation'])
+                            math_channels_dict[pname]['placeholder_equation'][index] = str(value) 
+                            if (pname == "test"):
+                                print("original after")
+                                print(math_channels_dict[pname]['equation'])
+                                print("placeholder after:")
+                                print(math_channels_dict[pname]['placeholder_equation'])
+                            # print(f"value is {value}")
+                            # print(math_channels_dict[pname]['placeholder_equation'])
 
             # if plot is visible, update series
             if dpg.does_item_exist(f'{id}_series'):
@@ -920,11 +941,18 @@ def update_plots():
                 dpg.fit_axis_data(f'{id}_x')
                 dpg.bind_item_theme(f'{id}_series', "plot_theme")
         for pname in math_channels_plot_data:
+            # print(math_channels_dict[pname]['placeholder_equation'])
             # calculate placeholder equation
             value = evaluate_infix(math_channels_dict[pname]['placeholder_equation'])
+            # print(value)
             math_channels_plot_data[pname]['x'].append(t)
             math_channels_plot_data[pname]['y'].append(value)
-        print(math_channels_plot_data)
+            if dpg.does_item_exist(f'{pname}_series'):
+                dpg.set_value(f'{pname}_series', [list(math_channels_plot_data[pname]['x']), list(math_channels_plot_data[pname]['y'])])
+                dpg.set_item_label(f'{pname}_value', round(math_channels_plot_data[pname]['y'][-1], 3))
+                dpg.fit_axis_data(f'{pname}_x')
+                # dpg.bind_item_theme(f'{pname}_series', "plot_theme")
+        # print(math_channels_plot_data)
         time.sleep(1 / PLOT_RATE_HZ)
 
 threading.Thread(target=update_plots, daemon=True).start()
