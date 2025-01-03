@@ -330,17 +330,27 @@ def set_plot_size(sender, _):
     global PLOT_LENGTH_S
     global PLOT_RATE_HZ
     global plot_data
+    global math_channels_plot_data
 
     PLOT_LENGTH_S = dpg.get_value('plot_length')
     PLOT_RATE_HZ = dpg.get_value('plot_rate')
 
-    # create new deques of the right size
+    # create new deques of the right size for normal parameters 
     plot_data = {
         id: {
             'x': deque(plot_data[id]['x'], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
             'y': deque(plot_data[id]['y'], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
         } for id in parameters.keys()
     }
+
+    # create new deques of the right size for math channels
+    math_channels_plot_data = {
+        pname: {
+            'x': deque(math_channels_plot_data[pname]['x'], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+            'y': deque(math_channels_plot_data[pname]['y'], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ)
+        } for pname in math_channels_dict.keys()
+    }
+
 
 # display options for port selection
 def set_port_type(sender, port_type):
@@ -500,9 +510,14 @@ def load_preset(sender, app_data, preset_name):
     reader = csv.DictReader(f)
     # add plots for each preset entry
     for row in reader:
-        pid = int(row['id'])
-        add_plot(None, None, pid)
-        dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+        if row['id'].isdigit():
+            pid = int(row['id'])
+            add_plot(None, None, pid)
+            dpg.set_axis_limits(f'{pid}_y', float(row['y_min']), float(row['y_max']))
+        else:
+            pname = row['id']
+            add_plot_math(None, None, pname)
+            dpg.set_axis_limits(f'{pname}_y', float(row['y_min']), float(row['y_max']))
     f.close()
 
 # callback for Save Preset, gets name input
@@ -516,7 +531,8 @@ def save_preset(sender):
 def save_preset_to_csv(sender):
     global parameters
     plots = []
-    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias]
+    pids = [int(alias[7:]) for alias in dpg.get_aliases() if 'p_plot_' in alias and alias[7:] not in math_channels_dict]
+    math_channels = [alias[7:] for alias in dpg.get_aliases() if 'p_plot_' in alias and alias[7:] in math_channels_dict]
     # find currently visible plots
     for pid in pids:
         # if dpg.is_item_visible(f'p_plot_{pid}'):
@@ -531,6 +547,20 @@ def save_preset_to_csv(sender):
             'y_min': y_axis[0],
             'y_max': y_axis[1],
             'v_pos': dpg.get_item_pos(f'p_plot_{pid}')[1]
+        })
+    for pname in math_channels:
+        # if dpg.is_item_visible(f'p_plot_{pid}'):
+        y_axis = dpg.get_axis_limits(f'{pname}_y')
+        # TODO: axis limits on invisible plots are defaulted to 0.5 and -0.5, works for now but is not long term solution
+        if (y_axis[0] == 0 and y_axis[1] == 0):
+            y_axis[0] = -0.5
+            y_axis[1] = 0.5
+        plots.append({
+            'id': pname,
+            'name': pname,
+            'y_min': y_axis[0],
+            'y_max': y_axis[1],
+            'v_pos': dpg.get_item_pos(f'p_plot_{pname}')[1]
         })
     # sort by vertical position
     plots.sort(key=lambda p: p['v_pos'])
@@ -720,25 +750,23 @@ def evaluate_infix(expression):
     i = 0
     while i < len(expression):
         token = expression[i]
-
-        # If the token is a negative number (e.g., "-90.0466")
+        # check if the token is a negative number
         if token.startswith("-") and token[1:].replace(".", "", 1).isdigit():
-            values.append(float(token))  # Convert to float
-        # If the token is a number (integer or float)
+            values.append(float(token))
+        # make sure the token is a number
         elif token.replace(".", "", 1).isdigit():
-            values.append(float(token))  # Convert to float
-        elif token == "(":  # If token is a left parenthesis
+            values.append(float(token))
+        elif token == "(":  
             ops.append(token)
-        elif token == ")":  # If token is a right parenthesis
+        elif token == ")":  
             while ops and ops[-1] != "(":
                 values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
-            ops.pop()  # Remove the "("
-        elif token in operators:  # If token is an operator
-            # Handle negative numbers (unary minus) by looking at the previous token
+            ops.pop()
+        elif token in operators: 
+            # Handle negative numbers by looking at the previous token
             if token == "-" and (i == 0 or expression[i - 1] in operators or expression[i - 1] == "("):
-                # Treat it as a negative number
                 i += 1
-                token = "-" + expression[i]  # Combine with the next token
+                token = "-" + expression[i]  # Combine negative sign with the next token
                 values.append(float(token))
             else:
                 # Handle precedence and associativity
@@ -748,13 +776,10 @@ def evaluate_infix(expression):
                 ops.append(token)
         else:
             raise ValueError(f"Invalid token: {token}")
-
         i += 1
-
     # Apply remaining operators
     while ops:
         values.append(apply_operator(ops.pop(), values.pop(), values.pop()))
-
     return values[0]
 
 # add math channel plot

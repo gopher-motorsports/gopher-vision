@@ -7,4 +7,3 @@ dearpygui_ext
 pyinstaller
 pyserial
 supabase
-copy
