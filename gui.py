@@ -596,6 +596,12 @@ def delete_preset(sender, app_data, preset_name):
 def math_btn_callback(sender):
     global custom_parameters_list
     global screen_width
+    
+    # check if window has been closed properly
+    if dpg.does_item_exist('math_channel_window'): dpg.delete_item('math_channel_window')
+    if dpg.does_item_exist('math_channel_parameter_list'): dpg.delete_item('math_channel_parameter_list')
+    if dpg.does_item_exist('math_channel_operators'): dpg.delete_item('math_channel_operators')
+
     with dpg.window(label="Create Custom Parameter", tag="math_channel_window", width=screen_width/2, height=300):
         with dpg.group(horizontal=True, parent='math_channel_window'):
             dpg.add_button(tag='clear_custom_parameter_equation', label='Clear', callback=clear_custom_parameter_equation)
