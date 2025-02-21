@@ -1493,9 +1493,9 @@ def packets_lost():
         return 0.0
     # Access specific data
     logged_last_val = len(plot_data[624]["x"]) - 1
-    packets_logged = plot_data[624]["y"][logged_last_val]
+    packets_logged = plot_data[201]["y"][logged_last_val]
     dropped_last_val = len(plot_data[625]["x"]) - 1
-    packets_dropped = plot_data[625]["y"][dropped_last_val]
+    packets_dropped = plot_data[202]["y"][dropped_last_val]
     total_packets = packets_dropped + packets_logged
 
     if packets_logged > 0 and packets_dropped > 0:
