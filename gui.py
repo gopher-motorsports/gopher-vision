@@ -1492,9 +1492,9 @@ def packets_lost():
     if not yaml_open:
         return 0.0
     # Access specific data
-    logged_last_val = len(plot_data[624]["x"]) - 1
+    logged_last_val = len(plot_data[201]["x"]) - 1
     packets_logged = plot_data[201]["y"][logged_last_val]
-    dropped_last_val = len(plot_data[625]["x"]) - 1
+    dropped_last_val = len(plot_data[202]["x"]) - 1
     packets_dropped = plot_data[202]["y"][dropped_last_val]
     total_packets = packets_dropped + packets_logged
 
