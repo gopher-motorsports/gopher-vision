@@ -50,19 +50,7 @@ last_coord = (0, 0)
 is_custum_parameter_1_empty = True
 is_custum_parameter_2_empty = True
 custom_parameters_list = []
-math_channels_dict = {
-    # these are just hard coded channels for testing purposes
-    # 'Wheel RPM': {
-    #     'equation': [[3, 'Electrical RPM'], '/', '10'],
-    #     'placeholder_equation': [[3, 'Electrical RPM'], '/', '10'],
-    #     'unit': 'NA'
-    #     },
-    # 'Average Front Wheel Speeds': {
-    #     'equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'],
-    #     'placeholder_equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'],
-    #     'unit': 'NA'
-    #     }
-}
+math_channels_dict = {}
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -230,6 +218,9 @@ def load_config(file=None):
         for name in math_channels_dict.keys()
     }
 
+# ====================================================================================================
+# CONVERT TAB
+# ====================================================================================================
 
 # callback for "Convert" button in Data Parser tab
 # converts .gdat files to .ld
@@ -276,147 +267,9 @@ def convert():
             overlay=f"{n}/{len(paths)}",
         )
 
-
-# callback for "Add Parameter" button in Telemetry tab
-# creates a plot for a loaded GCAN parameter
-def add_plot(sender, app_data, pid):
-    global is_collumn_two
-    global last_coord
-    global parameters
-
-    # check if pid is defined in loaded config
-    if pid not in parameters:
-        return
-    # check if current plot already exists
-    pids = [
-        int(alias[7:])
-        for alias in dpg.get_aliases()
-        if "p_plot_" in alias and alias[7:] not in math_channels_dict
-    ]
-    if pid in pids:
-        return
-
-    parameter = parameters[pid]
-
-    # clean-up in case this plot was removed and re-added
-    if dpg.does_alias_exist(f"p_plot_{pid}"):
-        dpg.remove_alias(f"p_plot_{pid}")
-    if dpg.does_alias_exist(f"{pid}_x"):
-        dpg.remove_alias(f"{pid}_x")
-    if dpg.does_alias_exist(f"{pid}_y"):
-        dpg.remove_alias(f"{pid}_y")
-    if dpg.does_alias_exist(f"{pid}_series"):
-        dpg.remove_alias(f"{pid}_series")
-    if dpg.does_alias_exist(f"{pid}_value"):
-        dpg.remove_alias(f"{pid}_value")
-
-    # add new plot
-    if is_collumn_two:
-        with dpg.collapsing_header(
-            tag=f"{pid}_collapsing_header",
-            label=f"{parameter['name']} ({pid})",
-            closable=True,
-            default_open=True,
-            parent="tab-telemetry",
-            pos=(last_coord[0] + screen_width * 0.5, last_coord[1] - 120),
-        ):
-            with dpg.plot(
-                tag=f"p_plot_{pid}",
-                width=-1,
-                height=150,
-                no_mouse_pos=True,
-                no_box_select=True,
-                use_local_time=True,
-                anti_aliased=True,
-                pos=(last_coord[0] + screen_width * 0.5, last_coord[1] - 97),
-            ):
-                dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f"{pid}_x")
-                dpg.add_plot_axis(dpg.mvYAxis, label=parameter["unit"], tag=f"{pid}_y")
-                dpg.add_line_series(
-                    list(plot_data[pid]["x"]),
-                    list(plot_data[pid]["y"]),
-                    label=parameter["name"],
-                    parent=f"{pid}_y",
-                    tag=f"{pid}_series",
-                )
-                dpg.add_plot_annotation(
-                    label="0.0", offset=(float("inf"), float("inf")), tag=f"{pid}_value"
-                )
-        is_collumn_two = False
-        last_coord = (last_coord[0] + 400, last_coord[1])
-    else:
-        with dpg.collapsing_header(
-            tag=f"{pid}_collapsing_header",
-            label=f"{parameter['name']} ({pid})",
-            closable=True,
-            default_open=True,
-            parent="tab-telemetry",
-            pos=(0, last_coord[1] + 55),
-        ):
-            with dpg.plot(
-                tag=f"p_plot_{pid}",
-                width=(screen_width / 2) - 8,
-                height=150,
-                no_mouse_pos=True,
-                no_box_select=True,
-                use_local_time=True,
-                anti_aliased=True,
-            ):
-                dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f"{pid}_x")
-                dpg.add_plot_axis(dpg.mvYAxis, label=parameter["unit"], tag=f"{pid}_y")
-                dpg.add_line_series(
-                    list(plot_data[pid]["x"]),
-                    list(plot_data[pid]["y"]),
-                    label=parameter["name"],
-                    parent=f"{pid}_y",
-                    tag=f"{pid}_series",
-                )
-                dpg.add_plot_annotation(
-                    label="0.0", offset=(float("inf"), float("inf")), tag=f"{pid}_value"
-                )
-        is_collumn_two = True
-        last_coord = (0, last_coord[1] + 175)
-
-
-# callback for Clear
-def clear_parameters(sender):
-    global is_collumn_two
-    global last_coord
-    pids = [
-        int(alias[7:])
-        for alias in dpg.get_aliases()
-        if "p_plot_" in alias and alias[7:] not in math_channels_dict
-    ]
-    for pid in pids:
-        dpg.delete_item(f"{pid}_collapsing_header")
-        if dpg.does_alias_exist(f"p_plot_{pid}"):
-            dpg.remove_alias(f"p_plot_{pid}")
-        if dpg.does_alias_exist(f"{pid}_x"):
-            dpg.remove_alias(f"{pid}_x")
-        if dpg.does_alias_exist(f"{pid}_y"):
-            dpg.remove_alias(f"{pid}_y")
-        if dpg.does_alias_exist(f"{pid}_series"):
-            dpg.remove_alias(f"{pid}_series")
-        if dpg.does_alias_exist(f"{pid}_value"):
-            dpg.remove_alias(f"{pid}_value")
-
-    # clear math channels
-    for pname in math_channels_dict:
-        dpg.delete_item(f"{pname}_collapsing_header")
-        if dpg.does_alias_exist(f"p_plot_{pname}"):
-            dpg.remove_alias(f"p_plot_{pname}")
-        if dpg.does_alias_exist(f"{pname}_x"):
-            dpg.remove_alias(f"{pname}_x")
-        if dpg.does_alias_exist(f"{pname}_y"):
-            dpg.remove_alias(f"{pname}_y")
-        if dpg.does_alias_exist(f"{pname}_series"):
-            dpg.remove_alias(f"{pname}_series")
-        if dpg.does_alias_exist(f"{pname}_value"):
-            dpg.remove_alias(f"{pname}_value")
-
-    is_collumn_two = False
-    last_coord = (0, 0)
-
+# ====================================================================================================
+# RECORDING
+# ====================================================================================================
 
 def start_recording(sender, _):
     global node
@@ -443,37 +296,9 @@ def stop_recording(sender, _):
     )
 
 
-def set_plot_size(sender, _):
-    global PLOT_LENGTH_S
-    global PLOT_RATE_HZ
-    global plot_data
-    global math_channels_plot_data
-
-    PLOT_LENGTH_S = dpg.get_value("plot_length")
-    PLOT_RATE_HZ = dpg.get_value("plot_rate")
-
-    # create new deques of the right size for normal parameters
-    plot_data = {
-        id: {
-            "x": deque(plot_data[id]["x"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
-            "y": deque(plot_data[id]["y"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
-        }
-        for id in parameters.keys()
-    }
-
-    # create new deques of the right size for math channels
-    math_channels_plot_data = {
-        pname: {
-            "x": deque(
-                math_channels_plot_data[pname]["x"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ
-            ),
-            "y": deque(
-                math_channels_plot_data[pname]["y"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ
-            ),
-        }
-        for pname in math_channels_dict.keys()
-    }
-
+# ====================================================================================================
+# PORTS
+# ====================================================================================================
 
 # display options for port selection
 def set_port_type(sender, port_type):
@@ -539,6 +364,9 @@ import socket  # Imported here because I would like to move this function out of
 client = socket.socket()
 connected = False
 
+# ====================================================================================================
+# TRACKSIDE
+# ====================================================================================================
 
 def manage_client(client_socket, addr):
     global node
@@ -587,25 +415,6 @@ def host_trackside():
         dpg.stop_dearpygui()  # TODO: consider not killing gui, just displaying message?
         exit()
 
-
-# load presets from csv file
-def load_preset_csv(file=None):
-    if file:
-        f = open(file)
-    else:
-        f = filedialog.askopenfile(
-            title="Load GopherVision preset", filetypes=[("CSV", "*.csv")]
-        )
-
-    reader = csv.DictReader(f)
-    # add plots for each preset entry
-    for row in reader:
-        pid = int(row["id"])
-        add_plot(None, None, pid)
-        dpg.set_axis_limits(f"{pid}_y", float(row["y_min"]), float(row["y_max"]))
-    f.close()
-
-
 def trackside_connect(sender, _):
     global client, connected
     if connected:
@@ -631,6 +440,9 @@ def trackside_connect(sender, _):
     else:
         print(f"Received: {response}")
 
+# ====================================================================================================
+# DARK / LIGHT MODE
+# ====================================================================================================
 
 toggle = 0  # var for switching themes
 color_R = 255
@@ -664,6 +476,9 @@ def toggle_mode(sender):
         color_G = 255
         color_B = 255
 
+# ====================================================================================================
+# PRESETS
+# ====================================================================================================
 
 # load preset
 def load_preset(sender, app_data, preset_name):
@@ -799,6 +614,26 @@ def delete_preset(sender, app_data, preset_name):
             user_data=preset,
         )
 
+# load presets from csv file
+def load_preset_csv(file=None):
+    if file:
+        f = open(file)
+    else:
+        f = filedialog.askopenfile(
+            title="Load GopherVision preset", filetypes=[("CSV", "*.csv")]
+        )
+
+    reader = csv.DictReader(f)
+    # add plots for each preset entry
+    for row in reader:
+        pid = int(row["id"])
+        add_plot(None, None, pid)
+        dpg.set_axis_limits(f"{pid}_y", float(row["y_min"]), float(row["y_max"]))
+    f.close()
+
+# ====================================================================================================
+# MATH CHANNELS
+# ====================================================================================================
 
 # callback for math
 def math_btn_callback(sender):
@@ -1229,7 +1064,181 @@ def add_plot_math(sender, app_data, channel_name):
         is_collumn_two = True
         last_coord = (0, last_coord[1] + 175)
 
+# ====================================================================================================
+# DPG SETUP
+# ====================================================================================================
 
+def set_plot_size(sender, _):
+    global PLOT_LENGTH_S
+    global PLOT_RATE_HZ
+    global plot_data
+    global math_channels_plot_data
+
+    PLOT_LENGTH_S = dpg.get_value("plot_length")
+    PLOT_RATE_HZ = dpg.get_value("plot_rate")
+
+    # create new deques of the right size for normal parameters
+    plot_data = {
+        id: {
+            "x": deque(plot_data[id]["x"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+            "y": deque(plot_data[id]["y"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
+        }
+        for id in parameters.keys()
+    }
+
+    # create new deques of the right size for math channels
+    math_channels_plot_data = {
+        pname: {
+            "x": deque(
+                math_channels_plot_data[pname]["x"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ
+            ),
+            "y": deque(
+                math_channels_plot_data[pname]["y"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ
+            ),
+        }
+        for pname in math_channels_dict.keys()
+    }
+    
+# callback for "Add Parameter" button in Telemetry tab
+# creates a plot for a loaded GCAN parameter
+def add_plot(sender, app_data, pid):
+    global is_collumn_two
+    global last_coord
+    global parameters
+
+    # check if pid is defined in loaded config
+    if pid not in parameters:
+        return
+    # check if current plot already exists
+    pids = [
+        int(alias[7:])
+        for alias in dpg.get_aliases()
+        if "p_plot_" in alias and alias[7:] not in math_channels_dict
+    ]
+    if pid in pids:
+        return
+
+    parameter = parameters[pid]
+
+    # clean-up in case this plot was removed and re-added
+    if dpg.does_alias_exist(f"p_plot_{pid}"):
+        dpg.remove_alias(f"p_plot_{pid}")
+    if dpg.does_alias_exist(f"{pid}_x"):
+        dpg.remove_alias(f"{pid}_x")
+    if dpg.does_alias_exist(f"{pid}_y"):
+        dpg.remove_alias(f"{pid}_y")
+    if dpg.does_alias_exist(f"{pid}_series"):
+        dpg.remove_alias(f"{pid}_series")
+    if dpg.does_alias_exist(f"{pid}_value"):
+        dpg.remove_alias(f"{pid}_value")
+
+    # add new plot
+    if is_collumn_two:
+        with dpg.collapsing_header(
+            tag=f"{pid}_collapsing_header",
+            label=f"{parameter['name']} ({pid})",
+            closable=True,
+            default_open=True,
+            parent="tab-telemetry",
+            pos=(last_coord[0] + screen_width * 0.5, last_coord[1] - 120),
+        ):
+            with dpg.plot(
+                tag=f"p_plot_{pid}",
+                width=-1,
+                height=150,
+                no_mouse_pos=True,
+                no_box_select=True,
+                use_local_time=True,
+                anti_aliased=True,
+                pos=(last_coord[0] + screen_width * 0.5, last_coord[1] - 97),
+            ):
+                dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f"{pid}_x")
+                dpg.add_plot_axis(dpg.mvYAxis, label=parameter["unit"], tag=f"{pid}_y")
+                dpg.add_line_series(
+                    list(plot_data[pid]["x"]),
+                    list(plot_data[pid]["y"]),
+                    label=parameter["name"],
+                    parent=f"{pid}_y",
+                    tag=f"{pid}_series",
+                )
+                dpg.add_plot_annotation(
+                    label="0.0", offset=(float("inf"), float("inf")), tag=f"{pid}_value"
+                )
+        is_collumn_two = False
+        last_coord = (last_coord[0] + 400, last_coord[1])
+    else:
+        with dpg.collapsing_header(
+            tag=f"{pid}_collapsing_header",
+            label=f"{parameter['name']} ({pid})",
+            closable=True,
+            default_open=True,
+            parent="tab-telemetry",
+            pos=(0, last_coord[1] + 55),
+        ):
+            with dpg.plot(
+                tag=f"p_plot_{pid}",
+                width=(screen_width / 2) - 8,
+                height=150,
+                no_mouse_pos=True,
+                no_box_select=True,
+                use_local_time=True,
+                anti_aliased=True,
+            ):
+                dpg.add_plot_axis(dpg.mvXAxis, time=True, tag=f"{pid}_x")
+                dpg.add_plot_axis(dpg.mvYAxis, label=parameter["unit"], tag=f"{pid}_y")
+                dpg.add_line_series(
+                    list(plot_data[pid]["x"]),
+                    list(plot_data[pid]["y"]),
+                    label=parameter["name"],
+                    parent=f"{pid}_y",
+                    tag=f"{pid}_series",
+                )
+                dpg.add_plot_annotation(
+                    label="0.0", offset=(float("inf"), float("inf")), tag=f"{pid}_value"
+                )
+        is_collumn_two = True
+        last_coord = (0, last_coord[1] + 175)
+
+
+# callback for Clear
+def clear_parameters(sender):
+    global is_collumn_two
+    global last_coord
+    pids = [
+        int(alias[7:])
+        for alias in dpg.get_aliases()
+        if "p_plot_" in alias and alias[7:] not in math_channels_dict
+    ]
+    for pid in pids:
+        dpg.delete_item(f"{pid}_collapsing_header")
+        if dpg.does_alias_exist(f"p_plot_{pid}"):
+            dpg.remove_alias(f"p_plot_{pid}")
+        if dpg.does_alias_exist(f"{pid}_x"):
+            dpg.remove_alias(f"{pid}_x")
+        if dpg.does_alias_exist(f"{pid}_y"):
+            dpg.remove_alias(f"{pid}_y")
+        if dpg.does_alias_exist(f"{pid}_series"):
+            dpg.remove_alias(f"{pid}_series")
+        if dpg.does_alias_exist(f"{pid}_value"):
+            dpg.remove_alias(f"{pid}_value")
+
+    # clear math channels
+    for pname in math_channels_dict:
+        dpg.delete_item(f"{pname}_collapsing_header")
+        if dpg.does_alias_exist(f"p_plot_{pname}"):
+            dpg.remove_alias(f"p_plot_{pname}")
+        if dpg.does_alias_exist(f"{pname}_x"):
+            dpg.remove_alias(f"{pname}_x")
+        if dpg.does_alias_exist(f"{pname}_y"):
+            dpg.remove_alias(f"{pname}_y")
+        if dpg.does_alias_exist(f"{pname}_series"):
+            dpg.remove_alias(f"{pname}_series")
+        if dpg.does_alias_exist(f"{pname}_value"):
+            dpg.remove_alias(f"{pname}_value")
+
+    is_collumn_two = False
+    last_coord = (0, 0)
+    
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
@@ -1502,6 +1511,9 @@ def packets_lost():
         packets_lost_pct = packets_dropped / total_packets
     return packets_lost_pct
 
+# ====================================================================================================
+# MAIN LOOP / DATA UPDATES
+# ====================================================================================================
 
 # transfer values from receiver to plots at a configurable rate
 def update_plots():
