@@ -45,6 +45,7 @@ node = live.Node()
 node.tx_port.open_socket()
 node.tx_port.port.connect(("1.1.1.1", 80))
 IP = node.tx_port.port.getsockname()[0]
+# second column initializations
 is_collumn_two = False
 last_coord = (0, 0)
 is_custum_parameter_1_empty = True
@@ -54,11 +55,15 @@ math_channels_dict = {}
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
+# main data dictionaries
 parameters = {}
 plot_data = {}
 # separate plot data dictionary for math channels, keys are names of the math channels
 math_channels_plot_data = {}
 
+# ====================================================================================================
+# Config
+# ====================================================================================================
 
 # Returns the directory where the script or executable is located.
 def get_executable_dir():
@@ -989,6 +994,10 @@ def add_plot_math(sender, app_data, channel_name):
     if dpg.does_alias_exist(f"{channel_name}_value"):
         dpg.remove_alias(f"{channel_name}_value")
 
+# ====================================================================================================
+# Second column
+# ====================================================================================================
+
     # add new plot
     if is_collumn_two:
         with dpg.collapsing_header(
@@ -1083,7 +1092,7 @@ def set_plot_size(sender, _):
             "x": deque(plot_data[id]["x"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
             "y": deque(plot_data[id]["y"], maxlen=PLOT_LENGTH_S * PLOT_RATE_HZ),
         }
-        for id in parameters.keys()
+        for id in parameters.keys() # sets IDs in plot data
     }
 
     # create new deques of the right size for math channels
@@ -1527,7 +1536,7 @@ def update_plots():
         for id, value in node.values.items():
             # update plot data
             plot_data[id]["x"].append(t)
-            plot_data[id]["y"].append(value)
+            plot_data[id]["y"].append(value) # this is where data is being added
             # update placeholer equation for math
             for pname in math_channels_dict:
                 for index, token in enumerate(math_channels_dict[pname]["equation"]):
