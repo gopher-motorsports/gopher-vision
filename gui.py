@@ -51,7 +51,19 @@ last_coord = (0, 0)
 is_custum_parameter_1_empty = True
 is_custum_parameter_2_empty = True
 custom_parameters_list = []
-math_channels_dict = {}
+math_channels_dict = {
+    # these are just hard coded channels for testing purposes
+    # 'Wheel RPM': {
+    #     'equation': [[3, 'Electrical RPM'], '/', '10'],
+    #     'placeholder_equation': [[3, 'Electrical RPM'], '/', '10'],
+    #     'unit': 'NA'
+    #     },
+    # 'Average Front Wheel Speeds': {
+    #     'equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'],
+    #     'placeholder_equation': ['(', [120, 'Wheel Speed FL'], '+', [121, 'Wheel Speed FR'], ')', '/', '2'],
+    #     'unit': 'NA'
+    #     }
+}
 # Use tkinter to get the screen's width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
